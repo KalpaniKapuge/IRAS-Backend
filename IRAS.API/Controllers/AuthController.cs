@@ -1,4 +1,6 @@
 // IRAS.API/Controllers/AuthController.cs
+using System.Security.Claims;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using IRAS.Application.Modules.Auth;
 using IRAS.Application.Modules.Auth.DTOs;
@@ -38,6 +40,18 @@ namespace IRAS.API.Controllers
             {
                 return Unauthorized(new { message = ex.Message });
             }
+        }
+
+        [Authorize]
+        [HttpGet("me")]
+        public IActionResult Me()
+        {
+            return Ok(new
+            {
+                userId = User.FindFirstValue(ClaimTypes.NameIdentifier),
+                email = User.FindFirstValue(ClaimTypes.Email),
+                role = User.FindFirstValue(ClaimTypes.Role)
+            });
         }
     }
 }

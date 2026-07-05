@@ -41,6 +41,11 @@ namespace IRAS.Application.Modules.Auth
                 Role = request.Role,
                 IsActive = true
             };
+
+            // Wrap the writes and token issuance in one transaction so a failure building the
+            // token (e.g. bad JWT config) can't leave behind a user with no way to log in via this response.
+            await using var transaction = await _db.Database.BeginTransactionAsync();
+
             _db.Users.Add(user);
             await _db.SaveChangesAsync();   // save first to get UserId
 
@@ -49,8 +54,8 @@ namespace IRAS.Application.Modules.Auth
                 _db.CandidateProfiles.Add(new CandidateProfile
                 {
                     CandidateId = user.UserId,
-                    FirstName = request.FirstName,
-                    LastName = request.LastName,
+                    FirstName = request.FirstName!,
+                    LastName = request.LastName!,
                     EducationLevel = EducationLevel.Bachelor,
                     TotalExpYears = 0
                 });
@@ -60,13 +65,15 @@ namespace IRAS.Application.Modules.Auth
                 _db.EmployerProfiles.Add(new EmployerProfile
                 {
                     EmployerId = user.UserId,
-                    CompanyName = request.CompanyName ?? "Unnamed Company",
+                    CompanyName = request.CompanyName!,
                     CompanySize = CompanySize.Small
                 });
             }
             await _db.SaveChangesAsync();
 
-            return BuildAuthResponse(user);
+            var response = BuildAuthResponse(user);
+            await transaction.CommitAsync();
+            return response;
         }
 
         public async Task<AuthResponse> LoginAsync(LoginRequest request)
@@ -88,11 +95,15 @@ namespace IRAS.Application.Modules.Auth
         {
             var jwtKey = _config["Jwt:Key"]!;
             var expiryMinutes = int.Parse(_config["Jwt:ExpiryMinutes"] ?? "120");
-            var expires = DateTime.UtcNow.AddMinutes(expiryMinutes);
+            var now = DateTime.UtcNow;
+            var expires = now.AddMinutes(expiryMinutes);
 
             var claims = new[]
             {
                 new Claim(JwtRegisteredClaimNames.Sub, user.UserId.ToString()),
+                new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
+                new Claim(JwtRegisteredClaimNames.Iat, ((DateTimeOffset)now).ToUnixTimeSeconds().ToString(), ClaimValueTypes.Integer64),
+                new Claim(ClaimTypes.NameIdentifier, user.UserId.ToString()),
                 new Claim(ClaimTypes.Email, user.Email),
                 new Claim(ClaimTypes.Role, user.Role.ToString())
             };
@@ -105,6 +116,7 @@ namespace IRAS.Application.Modules.Auth
                 issuer: _config["Jwt:Issuer"],
                 audience: _config["Jwt:Audience"],
                 claims: claims,
+                notBefore: now,
                 expires: expires,
                 signingCredentials: creds);
 
