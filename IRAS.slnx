@@ -1,0 +1,6 @@
+<Solution>
+  <Project Path="IRAS.API/IRAS.API.csproj" />
+  <Project Path="IRAS.Application/IRAS.Application.csproj" />
+  <Project Path="IRAS.Domain/IRAS.Domain.csproj" />
+  <Project Path="IRAS.Infrastructure/IRAS.Infrastructure.csproj" />
+</Solution>
