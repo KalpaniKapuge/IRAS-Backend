@@ -1,5 +1,7 @@
 // IRAS.Domain/Entities/Identity/User.cs
 using IRAS.Domain.Enums;
+using IRAS.Domain.Entities.Candidate;
+using IRAS.Domain.Entities.Employer;
 
 namespace IRAS.Domain.Entities.Identity
 {

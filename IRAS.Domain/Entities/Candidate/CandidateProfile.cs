@@ -1,6 +1,7 @@
 // IRAS.Domain/Entities/Candidate/CandidateProfile.cs
 using IRAS.Domain.Enums;
 using IRAS.Domain.Entities.Identity;
+using IRAS.Domain.Entities.Skills;
 
 namespace IRAS.Domain.Entities.Candidate
 {
