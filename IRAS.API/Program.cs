@@ -7,8 +7,11 @@ using Microsoft.OpenApi;
 using Swashbuckle.AspNetCore.SwaggerGen;
 using System.Text;
 using IRAS.API.Filters;
+using IRAS.Application.Data;
 using IRAS.Application.Modules.Auth;
 using IRAS.Application.Modules.Candidates;
+using IRAS.Application.Modules.Jobs;
+using IRAS.Application.Modules.SkillTaxonomy;
 using IRAS.Infrastructure.Data;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -39,6 +42,9 @@ builder.Services.AddDbContext<IrasDbContext>(options =>
 
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<ICandidateProfileService, CandidateProfileService>();
+builder.Services.AddScoped<ISkillTaxonomyService, SkillTaxonomyService>();
+builder.Services.AddScoped<IJobService, JobService>();
+builder.Services.AddScoped<IJdGenerator, TemplateJdGenerator>();
 
 var jwtSection = builder.Configuration.GetSection("Jwt");
 builder.Services.AddAuthentication(options =>
@@ -70,6 +76,15 @@ builder.Services.AddCors(options =>
 });
 
 var app = builder.Build();
+
+using (var scope = app.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<IrasDbContext>();
+    await DataSeeder.SeedAsync(
+        db,
+        builder.Configuration["Seed:AdminEmail"] ?? "admin@iras.local",
+        builder.Configuration["Seed:AdminPassword"] ?? "ChangeMe@123");
+}
 
 if (app.Environment.IsDevelopment())
 {

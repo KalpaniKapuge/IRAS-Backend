@@ -46,7 +46,7 @@ namespace IRAS.Infrastructure.Data
             b.Entity<CandidateProfile>()
                 .HasOne(c => c.User).WithOne(u => u.CandidateProfile)
                 .HasForeignKey<CandidateProfile>(c => c.CandidateId);
-
+            
             b.Entity<EmployerProfile>().HasKey(e => e.EmployerId);
 
             b.Entity<EmployerProfile>()
@@ -81,6 +81,18 @@ namespace IRAS.Infrastructure.Data
             b.Entity<JobRequiredSkill>().Property(j => j.Weight).HasColumnType("decimal(5,4)");
             b.Entity<CandidateProfile>().Property(c => c.TotalExpYears).HasColumnType("decimal(4,1)");
             b.Entity<CandidateSkill>().Property(c => c.YearsExp).HasColumnType("decimal(4,1)");
+
+            // ---- Skill deletion safety: block deletes when the skill is referenced ----
+            b.Entity<CandidateSkill>().HasOne(cs => cs.Skill).WithMany()
+                .HasForeignKey(cs => cs.SkillId).OnDelete(DeleteBehavior.Restrict);
+            b.Entity<JobRequiredSkill>().HasOne(jrs => jrs.Skill).WithMany()
+                .HasForeignKey(jrs => jrs.SkillId).OnDelete(DeleteBehavior.Restrict);
+            b.Entity<SkillGap>().HasOne(g => g.Skill).WithMany()
+                .HasForeignKey(g => g.SkillId).OnDelete(DeleteBehavior.Restrict);
+
+            // ---- Skill taxonomy uniqueness ----
+            b.Entity<Skill>().HasIndex(s => s.SkillName).IsUnique();
+            b.Entity<SkillAlias>().HasIndex(a => a.AliasText).IsUnique();
 
             // ---- Restrict cascade paths that SQL Server would reject as multiple cascade paths ----
             b.Entity<Application>().HasOne(a => a.Resume).WithMany()

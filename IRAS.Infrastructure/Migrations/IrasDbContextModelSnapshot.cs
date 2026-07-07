@@ -813,9 +813,12 @@ namespace IRAS.Infrastructure.Migrations
 
                     b.Property<string>("SkillName")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                        .HasColumnType("nvarchar(450)");
 
                     b.HasKey("SkillId");
+
+                    b.HasIndex("SkillName")
+                        .IsUnique();
 
                     b.ToTable("Skills");
                 });
@@ -830,7 +833,7 @@ namespace IRAS.Infrastructure.Migrations
 
                     b.Property<string>("AliasText")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                        .HasColumnType("nvarchar(450)");
 
                     b.Property<int>("SkillId")
                         .HasColumnType("int");
@@ -841,6 +844,9 @@ namespace IRAS.Infrastructure.Migrations
                         .HasColumnType("nvarchar(30)");
 
                     b.HasKey("AliasId");
+
+                    b.HasIndex("AliasText")
+                        .IsUnique();
 
                     b.HasIndex("SkillId");
 
@@ -926,7 +932,7 @@ namespace IRAS.Infrastructure.Migrations
                     b.HasOne("IRAS.Domain.Entities.Skills.Skill", "Skill")
                         .WithMany()
                         .HasForeignKey("SkillId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.Navigation("Application");
@@ -1092,7 +1098,7 @@ namespace IRAS.Infrastructure.Migrations
                     b.HasOne("IRAS.Domain.Entities.Skills.Skill", "Skill")
                         .WithMany()
                         .HasForeignKey("SkillId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.Navigation("Job");
@@ -1111,7 +1117,7 @@ namespace IRAS.Infrastructure.Migrations
                     b.HasOne("IRAS.Domain.Entities.Skills.Skill", "Skill")
                         .WithMany()
                         .HasForeignKey("SkillId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.Navigation("Candidate");
