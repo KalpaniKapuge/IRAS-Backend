@@ -2,15 +2,24 @@
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
 using Swashbuckle.AspNetCore.SwaggerGen;
 using System.Text;
 using IRAS.API.Filters;
+using IRAS.Application.Common.Email;
+using IRAS.Application.Common.Notifications;
+using IRAS.Application.Common.Options;
+using IRAS.Application.Common.Scoring;
 using IRAS.Application.Data;
+using IRAS.Application.Modules.Applications;
 using IRAS.Application.Modules.Auth;
 using IRAS.Application.Modules.Candidates;
 using IRAS.Application.Modules.Jobs;
+using IRAS.Application.Modules.Matching;
+using IRAS.Application.Modules.Resumes;
+using IRAS.Application.Modules.SkillGaps;
 using IRAS.Application.Modules.SkillTaxonomy;
 using IRAS.Infrastructure.Data;
 
@@ -45,6 +54,43 @@ builder.Services.AddScoped<ICandidateProfileService, CandidateProfileService>();
 builder.Services.AddScoped<ISkillTaxonomyService, SkillTaxonomyService>();
 builder.Services.AddScoped<IJobService, JobService>();
 builder.Services.AddScoped<IJdGenerator, TemplateJdGenerator>();
+
+// Options
+builder.Services.Configure<FileStorageOptions>(
+    builder.Configuration.GetSection(FileStorageOptions.SectionName));
+builder.Services.Configure<AiServiceOptions>(
+    builder.Configuration.GetSection(AiServiceOptions.SectionName));
+
+// Typed HTTP client for the AI service
+builder.Services.AddHttpClient<IRAS.Application.Common.Ai.IAiServiceClient,
+                               IRAS.Application.Common.Ai.AiServiceClient>((sp, client) =>
+{
+    var opts = builder.Configuration.GetSection(AiServiceOptions.SectionName).Get<AiServiceOptions>()!;
+    client.BaseAddress = new Uri(opts.BaseUrl);
+    client.Timeout = TimeSpan.FromSeconds(opts.TimeoutSeconds);
+});
+
+// Storage + resume module
+builder.Services.AddSingleton<IRAS.Application.Common.Storage.IFileStorage,
+                              IRAS.Application.Common.Storage.LocalDiskFileStorage>();
+builder.Services.AddScoped<IResumeService, ResumeService>();
+
+// Scoring — shared by Module 6 (application ranking) and Module 8 (proactive matching)
+builder.Services.AddSingleton<IValidateOptions<ScoringOptions>, ScoringOptionsValidator>();
+builder.Services.AddOptions<ScoringOptions>()
+    .Bind(builder.Configuration.GetSection(ScoringOptions.SectionName))
+    .ValidateOnStart();
+builder.Services.AddScoped<IScoringService, ScoringService>();
+
+builder.Services.AddScoped<IApplicationService, ApplicationService>();
+
+// Notifications — LogEmailSender is the dev-safe default (no SMTP credentials needed);
+// swap in a real SmtpEmailSender/SendGridEmailSender behind the same IEmailSender later.
+builder.Services.AddSingleton<IEmailSender, LogEmailSender>();
+builder.Services.AddScoped<INotificationService, NotificationService>();
+builder.Services.AddScoped<IJobMatchingService, JobMatchingService>();
+
+builder.Services.AddScoped<ISkillGapService, SkillGapService>();
 
 var jwtSection = builder.Configuration.GetSection("Jwt");
 builder.Services.AddAuthentication(options =>

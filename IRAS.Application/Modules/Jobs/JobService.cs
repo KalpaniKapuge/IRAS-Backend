@@ -1,6 +1,8 @@
 // IRAS.Application/Modules/Jobs/JobService.cs
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using IRAS.Application.Modules.Jobs.DTOs;
+using IRAS.Application.Modules.Matching;
 using IRAS.Domain.Entities.Jobs;
 using IRAS.Domain.Enums;
 using IRAS.Infrastructure.Data;
@@ -11,11 +13,16 @@ namespace IRAS.Application.Modules.Jobs
     {
         private readonly IrasDbContext _db;
         private readonly IJdGenerator _jdGenerator;
+        private readonly IJobMatchingService _matchingService;
+        private readonly ILogger<JobService> _logger;
 
-        public JobService(IrasDbContext db, IJdGenerator jdGenerator)
+        public JobService(
+            IrasDbContext db, IJdGenerator jdGenerator, IJobMatchingService matchingService, ILogger<JobService> logger)
         {
             _db = db;
             _jdGenerator = jdGenerator;
+            _matchingService = matchingService;
+            _logger = logger;
         }
 
         // ---- Employer profile ----
@@ -235,6 +242,17 @@ namespace IRAS.Application.Modules.Jobs
             job.Status = JobStatus.Published;
             job.PostedAt = DateTime.UtcNow;
             await _db.SaveChangesAsync();
+
+            // Proactive matching (Module 8) is best-effort: a failure here must never
+            // roll back or fail the publish itself, which is the primary contract of this call.
+            try
+            {
+                await _matchingService.RunMatchingForJobAsync(job.JobId, CancellationToken.None);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Auto-matching failed for job {JobId} after publish", job.JobId);
+            }
         }
 
         public async Task CloseJobAsync(int employerId, int jobId)

@@ -11,6 +11,12 @@
     <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.19.1" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- Needed for IFormFile in IResumeService — this is a plain class library, so the
+         ASP.NET Core types aren't available unless referenced explicitly. -->
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>

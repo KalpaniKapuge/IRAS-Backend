@@ -2,6 +2,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using IRAS.API.Extensions;
+using IRAS.Application.Modules.Applications;
 using IRAS.Application.Modules.Jobs;
 using IRAS.Application.Modules.Jobs.DTOs;
 
@@ -15,7 +16,13 @@ namespace IRAS.API.Controllers
     public class EmployerJobsController : ControllerBase
     {
         private readonly IJobService _service;
-        public EmployerJobsController(IJobService service) => _service = service;
+        private readonly IApplicationService _applications;
+
+        public EmployerJobsController(IJobService service, IApplicationService applications)
+        {
+            _service = service;
+            _applications = applications;
+        }
 
         private IActionResult? CheckAccess(int employerId)
         {
@@ -83,6 +90,13 @@ namespace IRAS.API.Controllers
             var deny = CheckAccess(employerId); if (deny != null) return deny;
             await _service.DeleteDraftJobAsync(employerId, jobId);
             return NoContent();
+        }
+
+        [HttpGet("{jobId:int}/applications")]
+        public async Task<IActionResult> GetRankedApplicants(int employerId, int jobId, CancellationToken ct)
+        {
+            var deny = CheckAccess(employerId); if (deny != null) return deny;
+            return Ok(await _applications.GetRankedApplicantsAsync(employerId, jobId, ct));
         }
     }
 }

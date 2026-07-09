@@ -1179,7 +1179,10 @@
         },
         "runtime": {
           "bin/placeholder/IRAS.Application.dll": {}
-        }
+        },
+        "frameworkReferences": [
+          "Microsoft.AspNetCore.App"
+        ]
       },
       "IRAS.Domain/1.0.0": {
         "type": "project",
