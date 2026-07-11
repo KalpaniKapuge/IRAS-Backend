@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using IRAS.API.Extensions;
 using IRAS.Application.Modules.Applications;
 using IRAS.Application.Modules.Applications.DTOs;
+using IRAS.Application.Modules.Feedback;
 
 namespace IRAS.API.Controllers
 {
@@ -15,7 +16,13 @@ namespace IRAS.API.Controllers
     public class ApplicationsController : ControllerBase
     {
         private readonly IApplicationService _service;
-        public ApplicationsController(IApplicationService service) => _service = service;
+        private readonly IFeedbackService _feedback;
+
+        public ApplicationsController(IApplicationService service, IFeedbackService feedback)
+        {
+            _service = service;
+            _feedback = feedback;
+        }
 
         [HttpPost]
         public async Task<IActionResult> Apply(ApplyForJobRequest request, CancellationToken ct)
@@ -24,5 +31,14 @@ namespace IRAS.API.Controllers
         [HttpGet("mine")]
         public async Task<IActionResult> GetMine(CancellationToken ct)
             => Ok(await _service.GetMyApplicationsAsync(User.GetUserId(), ct));
+
+        // Module 9 — only returns feedback the employer has actually reviewed and sent;
+        // 204 (not the draft) while it's still pending review.
+        [HttpGet("{applicationId:int}/feedback")]
+        public async Task<IActionResult> GetFeedback(int applicationId, CancellationToken ct)
+        {
+            var feedback = await _feedback.GetMyFeedbackAsync(User.GetUserId(), applicationId, ct);
+            return feedback is null ? NoContent() : Ok(feedback);
+        }
     }
 }

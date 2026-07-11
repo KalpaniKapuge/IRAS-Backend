@@ -16,6 +16,7 @@ using IRAS.Application.Data;
 using IRAS.Application.Modules.Applications;
 using IRAS.Application.Modules.Auth;
 using IRAS.Application.Modules.Candidates;
+using IRAS.Application.Modules.Feedback;
 using IRAS.Application.Modules.Jobs;
 using IRAS.Application.Modules.Matching;
 using IRAS.Application.Modules.Resumes;
@@ -82,8 +83,6 @@ builder.Services.AddOptions<ScoringOptions>()
     .ValidateOnStart();
 builder.Services.AddScoped<IScoringService, ScoringService>();
 
-builder.Services.AddScoped<IApplicationService, ApplicationService>();
-
 // Notifications — LogEmailSender is the dev-safe default (no SMTP credentials needed);
 // swap in a real SmtpEmailSender/SendGridEmailSender behind the same IEmailSender later.
 builder.Services.AddSingleton<IEmailSender, LogEmailSender>();
@@ -91,6 +90,13 @@ builder.Services.AddScoped<INotificationService, NotificationService>();
 builder.Services.AddScoped<IJobMatchingService, JobMatchingService>();
 
 builder.Services.AddScoped<ISkillGapService, SkillGapService>();
+
+// Feedback (Module 9) — TemplateFeedbackGenerator is the dev-safe default (no LLM API key
+// needed), same swappable pattern as IJdGenerator. Registered before IApplicationService
+// since ApplicationService depends on IFeedbackService.
+builder.Services.AddScoped<IFeedbackGenerator, TemplateFeedbackGenerator>();
+builder.Services.AddScoped<IFeedbackService, FeedbackService>();
+builder.Services.AddScoped<IApplicationService, ApplicationService>();
 
 var jwtSection = builder.Configuration.GetSection("Jwt");
 builder.Services.AddAuthentication(options =>

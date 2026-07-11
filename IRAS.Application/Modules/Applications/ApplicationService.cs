@@ -1,8 +1,10 @@
 // IRAS.Application/Modules/Applications/ApplicationService.cs
 using System.Linq.Expressions;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using IRAS.Application.Common.Scoring;
 using IRAS.Application.Modules.Applications.DTOs;
+using IRAS.Application.Modules.Feedback;
 using IRAS.Domain.Entities.Applications;
 using IRAS.Domain.Entities.Jobs;
 using IRAS.Domain.Enums;
@@ -42,13 +44,21 @@ namespace IRAS.Application.Modules.Applications
             }).ToList()
         };
 
+        private static readonly ApplicationStatus[] TerminalStatuses =
+            { ApplicationStatus.Rejected, ApplicationStatus.Hired, ApplicationStatus.Withdrawn };
+
         private readonly IrasDbContext _db;
         private readonly IScoringService _scoring;
+        private readonly IFeedbackService _feedback;
+        private readonly ILogger<ApplicationService> _logger;
 
-        public ApplicationService(IrasDbContext db, IScoringService scoring)
+        public ApplicationService(
+            IrasDbContext db, IScoringService scoring, IFeedbackService feedback, ILogger<ApplicationService> logger)
         {
             _db = db;
             _scoring = scoring;
+            _feedback = feedback;
+            _logger = logger;
         }
 
         public async Task<ApplicationDto> ApplyAsync(int candidateId, ApplyForJobRequest request, CancellationToken ct)
@@ -166,5 +176,57 @@ namespace IRAS.Application.Modules.Applications
                 .ToListAsync(ct);
         }
 
+        public async Task UpdateStatusAsync(
+            int employerId, int applicationId, UpdateApplicationStatusRequest request, CancellationToken ct)
+        {
+            var application = await _db.Applications.Include(a => a.Job)
+                .FirstOrDefaultAsync(a => a.ApplicationId == applicationId, ct)
+                ?? throw new KeyNotFoundException("Application not found.");
+            if (application.Job.EmployerId != employerId)
+                throw new KeyNotFoundException("Application not found.");
+
+            var newStatus = ParseEnum<ApplicationStatus>(request.Status, nameof(request.Status));
+            if (newStatus == ApplicationStatus.Withdrawn)
+                throw new InvalidOperationException("Only the candidate can withdraw an application.");
+            if (TerminalStatuses.Contains(application.Status))
+                throw new InvalidOperationException($"Cannot change status of an application that is already {application.Status}.");
+            if (newStatus == application.Status)
+                throw new InvalidOperationException("Application is already in this status.");
+
+            var oldStatus = application.Status;
+            application.Status = newStatus;
+            application.UpdatedAt = DateTime.UtcNow;
+
+            _db.ApplicationStatusHistories.Add(new ApplicationStatusHistory
+            {
+                ApplicationId = applicationId,
+                OldStatus = oldStatus,
+                NewStatus = newStatus,
+                ChangedBy = employerId   // EmployerProfile.EmployerId is the same value as the User's UserId
+            });
+            await _db.SaveChangesAsync(ct);
+
+            if (newStatus == ApplicationStatus.Rejected)
+            {
+                // Best-effort: a feedback-generation failure must never undo or fail the
+                // status change itself, which is the primary contract of this call.
+                try
+                {
+                    await _feedback.GenerateDraftAsync(applicationId, ct);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Feedback draft generation failed for application {ApplicationId}", applicationId);
+                }
+            }
+        }
+
+        private static TEnum ParseEnum<TEnum>(string value, string fieldName) where TEnum : struct, Enum
+        {
+            if (!Enum.TryParse<TEnum>(value, ignoreCase: true, out var result) || !Enum.IsDefined(result))
+                throw new ArgumentException(
+                    $"'{value}' is not a valid {fieldName}. Valid values: {string.Join(", ", Enum.GetNames<TEnum>())}.");
+            return result;
+        }
     }
 }

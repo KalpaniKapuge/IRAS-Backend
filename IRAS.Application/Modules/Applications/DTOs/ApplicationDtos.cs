@@ -50,4 +50,10 @@ namespace IRAS.Application.Modules.Applications.DTOs
         public DateTime AppliedAt { get; set; }
         public List<SkillGapDto> SkillGaps { get; set; } = new();
     }
+
+    public class UpdateApplicationStatusRequest
+    {
+        [Required]
+        public string Status { get; set; } = null!;   // Screened|Shortlisted|Interview|Rejected|Hired
+    }
 }
