@@ -16,8 +16,10 @@ using IRAS.Application.Data;
 using IRAS.Application.Modules.Applications;
 using IRAS.Application.Modules.Auth;
 using IRAS.Application.Modules.Candidates;
+using IRAS.Application.Modules.Chat;
 using IRAS.Application.Modules.Feedback;
 using IRAS.Application.Modules.Jobs;
+using IRAS.Application.Modules.KnowledgeBase;
 using IRAS.Application.Modules.Matching;
 using IRAS.Application.Modules.Resumes;
 using IRAS.Application.Modules.SkillGaps;
@@ -97,6 +99,14 @@ builder.Services.AddScoped<ISkillGapService, SkillGapService>();
 builder.Services.AddScoped<IFeedbackGenerator, TemplateFeedbackGenerator>();
 builder.Services.AddScoped<IFeedbackService, FeedbackService>();
 builder.Services.AddScoped<IApplicationService, ApplicationService>();
+
+// Chatbot (Module 10) — RuleBasedChatResponder is the dev-safe default (no LLM API key
+// needed), same swappable pattern as IJdGenerator/IFeedbackGenerator. ChatService reuses
+// ISkillGapService/IApplicationService/IJobMatchingService/INotificationService rather
+// than re-querying the database.
+builder.Services.AddScoped<IKnowledgeBaseService, KnowledgeBaseService>();
+builder.Services.AddScoped<IChatResponder, RuleBasedChatResponder>();
+builder.Services.AddScoped<IChatService, ChatService>();
 
 var jwtSection = builder.Configuration.GetSection("Jwt");
 builder.Services.AddAuthentication(options =>
