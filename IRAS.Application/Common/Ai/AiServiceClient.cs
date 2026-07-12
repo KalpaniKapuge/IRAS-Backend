@@ -86,6 +86,20 @@ namespace IRAS.Application.Common.Ai
             }
         }
 
+        public async Task<bool> CheckHealthAsync(CancellationToken ct)
+        {
+            try
+            {
+                var response = await _http.GetAsync("/health", ct);
+                return response.IsSuccessStatusCode;
+            }
+            catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
+            {
+                _logger.LogWarning(ex, "AI service health check failed");
+                return false;
+            }
+        }
+
         // Mirrors the Python response model. FastAPI emits snake_case, so we map explicitly
         // rather than relying on JsonSerializerDefaults.Web's camelCase convention.
         // Note: [property: JsonPropertyName] only works on ctor params that don't have a

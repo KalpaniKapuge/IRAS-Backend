@@ -28,5 +28,10 @@ namespace IRAS.Application.Common.Ai
 
         Task<RankResult> RankAsync(
             string jobDescription, IReadOnlyList<RankCandidateInput> candidates, CancellationToken ct);
+
+        // Liveness check against the Python service's /health — backs Admin's "AI Model
+        // Monitoring" screen. Returns false on any failure (timeout, connection refused,
+        // non-2xx) rather than throwing; a monitoring check should never itself crash.
+        Task<bool> CheckHealthAsync(CancellationToken ct);
     }
 }

@@ -39,4 +39,31 @@ namespace IRAS.Application.Modules.Admin.DTOs
         public string SkillName { get; set; } = null!;
         public int Occurrences { get; set; }
     }
+
+    // "AI Model Monitoring" in the Admin workflow — liveness of the Python AI service
+    // plus resume-parsing outcome counts, the closest proxy this system has for AI
+    // performance without a dedicated model-metrics pipeline.
+    public class AiModelStatusDto
+    {
+        public bool AiServiceOnline { get; set; }
+        public string AiServiceBaseUrl { get; set; } = null!;
+        public int TotalResumesParsed { get; set; }
+        public int TotalResumesFailed { get; set; }
+        public decimal ParseSuccessRate { get; set; }
+    }
+
+    // "System Settings" in the Admin workflow — read-only visibility into the current
+    // effective configuration (scoring weights, AI service, file storage limits).
+    // Deliberately read-only: these are bound via IValidateOptions.ValidateOnStart(),
+    // so runtime mutation would need a DB-backed settings store, not a quick add-on.
+    public class SystemSettingsDto
+    {
+        public decimal SkillMatchWeight { get; set; }
+        public decimal SemanticSimilarityWeight { get; set; }
+        public decimal AutoMatchThreshold { get; set; }
+        public string AiServiceBaseUrl { get; set; } = null!;
+        public int AiServiceTimeoutSeconds { get; set; }
+        public long MaxResumeFileSizeBytes { get; set; }
+        public int MaxResumesPerCandidate { get; set; }
+    }
 }

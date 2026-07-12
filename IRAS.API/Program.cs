@@ -121,6 +121,7 @@ builder.Services.AddScoped<IChatService, ChatService>();
 builder.Services.AddScoped<IUserManagementService, UserManagementService>();
 builder.Services.AddScoped<IJobModerationService, JobModerationService>();
 builder.Services.AddScoped<IReportingService, ReportingService>();
+builder.Services.AddScoped<ISystemStatusService, SystemStatusService>();
 
 var jwtSection = builder.Configuration.GetSection("Jwt");
 builder.Services.AddAuthentication(options =>
