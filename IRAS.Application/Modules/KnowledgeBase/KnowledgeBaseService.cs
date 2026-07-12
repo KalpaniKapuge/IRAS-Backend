@@ -1,5 +1,6 @@
 // IRAS.Application/Modules/KnowledgeBase/KnowledgeBaseService.cs
 using Microsoft.EntityFrameworkCore;
+using IRAS.Application.Common.Audit;
 using IRAS.Application.Modules.KnowledgeBase.DTOs;
 using IRAS.Domain.Enums;
 using IRAS.Infrastructure.Data;
@@ -13,8 +14,16 @@ namespace IRAS.Application.Modules.KnowledgeBase
 {
     public class KnowledgeBaseService : IKnowledgeBaseService
     {
+        private const string EntityType = "KnowledgeBase";
+
         private readonly IrasDbContext _db;
-        public KnowledgeBaseService(IrasDbContext db) => _db = db;
+        private readonly IAuditLogService _audit;
+
+        public KnowledgeBaseService(IrasDbContext db, IAuditLogService audit)
+        {
+            _db = db;
+            _audit = audit;
+        }
 
         public async Task<List<KnowledgeBaseDto>> GetAllAsync(CancellationToken ct)
         {
@@ -43,6 +52,8 @@ namespace IRAS.Application.Modules.KnowledgeBase
             };
             _db.KnowledgeBases.Add(entry);
             await _db.SaveChangesAsync(ct);
+
+            await _audit.LogAsync(adminId, "KnowledgeBaseCreated", EntityType, entry.KbId, ct);
             return ToDto(entry);
         }
 
@@ -58,14 +69,18 @@ namespace IRAS.Application.Modules.KnowledgeBase
             entry.UpdatedBy = adminId;
             entry.UpdatedAt = DateTime.UtcNow;
             await _db.SaveChangesAsync(ct);
+
+            await _audit.LogAsync(adminId, "KnowledgeBaseUpdated", EntityType, kbId, ct);
         }
 
-        public async Task DeleteAsync(int kbId, CancellationToken ct)
+        public async Task DeleteAsync(int adminId, int kbId, CancellationToken ct)
         {
             var entry = await _db.KnowledgeBases.FirstOrDefaultAsync(k => k.KbId == kbId, ct)
                 ?? throw new KeyNotFoundException("Knowledge base entry not found.");
             _db.KnowledgeBases.Remove(entry);
             await _db.SaveChangesAsync(ct);
+
+            await _audit.LogAsync(adminId, "KnowledgeBaseDeleted", EntityType, kbId, ct);
         }
 
         private static TEnum ParseEnum<TEnum>(string value, string fieldName) where TEnum : struct, Enum

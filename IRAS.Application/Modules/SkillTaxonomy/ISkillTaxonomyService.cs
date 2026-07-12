@@ -10,11 +10,13 @@ namespace IRAS.Application.Modules.SkillTaxonomy
         Task<SkillResolveResult> ResolveAsync(string text);
         Task<List<SkillDto>> ExportAllAsync();                    // for the Python AI service
 
-        Task<SkillDto> CreateAsync(CreateSkillRequest request);
-        Task UpdateAsync(int skillId, UpdateSkillRequest request);
-        Task DeleteAsync(int skillId);
+        // adminId is recorded to the audit log — Skill Management is an Admin-workflow
+        // item, so every taxonomy edit needs an accountable "who".
+        Task<SkillDto> CreateAsync(int adminId, CreateSkillRequest request);
+        Task UpdateAsync(int adminId, int skillId, UpdateSkillRequest request);
+        Task DeleteAsync(int adminId, int skillId);
 
-        Task<SkillAliasDto> AddAliasAsync(int skillId, AddAliasRequest request);
-        Task DeleteAliasAsync(int skillId, int aliasId);
+        Task<SkillAliasDto> AddAliasAsync(int adminId, int skillId, AddAliasRequest request);
+        Task DeleteAliasAsync(int adminId, int skillId, int aliasId);
     }
 }

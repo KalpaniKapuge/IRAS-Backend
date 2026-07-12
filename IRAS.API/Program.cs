@@ -8,11 +8,13 @@ using Microsoft.OpenApi;
 using Swashbuckle.AspNetCore.SwaggerGen;
 using System.Text;
 using IRAS.API.Filters;
+using IRAS.Application.Common.Audit;
 using IRAS.Application.Common.Email;
 using IRAS.Application.Common.Notifications;
 using IRAS.Application.Common.Options;
 using IRAS.Application.Common.Scoring;
 using IRAS.Application.Data;
+using IRAS.Application.Modules.Admin;
 using IRAS.Application.Modules.Applications;
 using IRAS.Application.Modules.Auth;
 using IRAS.Application.Modules.Candidates;
@@ -51,6 +53,11 @@ builder.Services.AddSwaggerGen(options =>
 
 builder.Services.AddDbContext<IrasDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+
+// Audit logging (Module 11) — registered early since several admin-only services below
+// depend on it. Needs HttpContext to capture the caller's IP address.
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<IAuditLogService, AuditLogService>();
 
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<ICandidateProfileService, CandidateProfileService>();
@@ -107,6 +114,13 @@ builder.Services.AddScoped<IApplicationService, ApplicationService>();
 builder.Services.AddScoped<IKnowledgeBaseService, KnowledgeBaseService>();
 builder.Services.AddScoped<IChatResponder, RuleBasedChatResponder>();
 builder.Services.AddScoped<IChatService, ChatService>();
+
+// Admin (Module 11) — user management, cross-employer job moderation, and reporting.
+// IAuditLogService itself is registered above; KnowledgeBaseService and
+// SkillTaxonomyService also write to it directly for their own admin-only mutations.
+builder.Services.AddScoped<IUserManagementService, UserManagementService>();
+builder.Services.AddScoped<IJobModerationService, JobModerationService>();
+builder.Services.AddScoped<IReportingService, ReportingService>();
 
 var jwtSection = builder.Configuration.GetSection("Jwt");
 builder.Services.AddAuthentication(options =>

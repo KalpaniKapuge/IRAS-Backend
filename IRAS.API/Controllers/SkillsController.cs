@@ -1,6 +1,7 @@
 // IRAS.API/Controllers/SkillsController.cs
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using IRAS.API.Extensions;
 using IRAS.Application.Modules.SkillTaxonomy;
 using IRAS.Application.Modules.SkillTaxonomy.DTOs;
 
@@ -36,13 +37,13 @@ namespace IRAS.API.Controllers
         [HttpPost]
         [Authorize(Roles = "Admin")]
         public async Task<IActionResult> Create(CreateSkillRequest request)
-            => Ok(await _service.CreateAsync(request));
+            => Ok(await _service.CreateAsync(User.GetUserId(), request));
 
         [HttpPut("{skillId:int}")]
         [Authorize(Roles = "Admin")]
         public async Task<IActionResult> Update(int skillId, UpdateSkillRequest request)
         {
-            await _service.UpdateAsync(skillId, request);
+            await _service.UpdateAsync(User.GetUserId(), skillId, request);
             return NoContent();
         }
 
@@ -50,20 +51,20 @@ namespace IRAS.API.Controllers
         [Authorize(Roles = "Admin")]
         public async Task<IActionResult> Delete(int skillId)
         {
-            await _service.DeleteAsync(skillId);
+            await _service.DeleteAsync(User.GetUserId(), skillId);
             return NoContent();
         }
 
         [HttpPost("{skillId:int}/aliases")]
         [Authorize(Roles = "Admin")]
         public async Task<IActionResult> AddAlias(int skillId, AddAliasRequest request)
-            => Ok(await _service.AddAliasAsync(skillId, request));
+            => Ok(await _service.AddAliasAsync(User.GetUserId(), skillId, request));
 
         [HttpDelete("{skillId:int}/aliases/{aliasId:int}")]
         [Authorize(Roles = "Admin")]
         public async Task<IActionResult> DeleteAlias(int skillId, int aliasId)
         {
-            await _service.DeleteAliasAsync(skillId, aliasId);
+            await _service.DeleteAliasAsync(User.GetUserId(), skillId, aliasId);
             return NoContent();
         }
     }

@@ -11,6 +11,6 @@ namespace IRAS.Application.Modules.KnowledgeBase
         Task<KnowledgeBaseDto> GetByIdAsync(int kbId, CancellationToken ct);
         Task<KnowledgeBaseDto> CreateAsync(int adminId, UpsertKnowledgeBaseRequest request, CancellationToken ct);
         Task UpdateAsync(int adminId, int kbId, UpsertKnowledgeBaseRequest request, CancellationToken ct);
-        Task DeleteAsync(int kbId, CancellationToken ct);
+        Task DeleteAsync(int adminId, int kbId, CancellationToken ct);
     }
 }

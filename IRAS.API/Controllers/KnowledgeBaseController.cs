@@ -40,7 +40,7 @@ namespace IRAS.API.Controllers
         [HttpDelete("{kbId:int}")]
         public async Task<IActionResult> Delete(int kbId, CancellationToken ct)
         {
-            await _service.DeleteAsync(kbId, ct);
+            await _service.DeleteAsync(User.GetUserId(), kbId, ct);
             return NoContent();
         }
     }

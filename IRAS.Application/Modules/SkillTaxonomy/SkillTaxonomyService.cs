@@ -1,5 +1,6 @@
 // IRAS.Application/Modules/SkillTaxonomy/SkillTaxonomyService.cs
 using Microsoft.EntityFrameworkCore;
+using IRAS.Application.Common.Audit;
 using IRAS.Application.Modules.SkillTaxonomy.DTOs;
 using IRAS.Domain.Entities.Skills;
 using IRAS.Domain.Enums;
@@ -9,8 +10,16 @@ namespace IRAS.Application.Modules.SkillTaxonomy
 {
     public class SkillTaxonomyService : ISkillTaxonomyService
     {
+        private const string EntityType = "Skill";
+
         private readonly IrasDbContext _db;
-        public SkillTaxonomyService(IrasDbContext db) => _db = db;
+        private readonly IAuditLogService _audit;
+
+        public SkillTaxonomyService(IrasDbContext db, IAuditLogService audit)
+        {
+            _db = db;
+            _audit = audit;
+        }
 
         public async Task<PagedResult<SkillDto>> SearchAsync(string? query, string? category, int page, int pageSize)
         {
@@ -90,7 +99,7 @@ namespace IRAS.Application.Modules.SkillTaxonomy
             return skills.Select(MapToDto).ToList();
         }
 
-        public async Task<SkillDto> CreateAsync(CreateSkillRequest request)
+        public async Task<SkillDto> CreateAsync(int adminId, CreateSkillRequest request)
         {
             var category = ParseEnum<SkillCategory>(request.Category, nameof(request.Category));
             var name = request.SkillName.Trim();
@@ -130,6 +139,7 @@ namespace IRAS.Application.Modules.SkillTaxonomy
                 await _db.SaveChangesAsync();
                 await tx.CommitAsync();
 
+                await _audit.LogAsync(adminId, "SkillCreated", EntityType, skill.SkillId, CancellationToken.None);
                 return await GetByIdAsync(skill.SkillId);
             }
             catch
@@ -139,7 +149,7 @@ namespace IRAS.Application.Modules.SkillTaxonomy
             }
         }
 
-        public async Task UpdateAsync(int skillId, UpdateSkillRequest request)
+        public async Task UpdateAsync(int adminId, int skillId, UpdateSkillRequest request)
         {
             var skill = await _db.Skills.FirstOrDefaultAsync(s => s.SkillId == skillId)
                 ?? throw new KeyNotFoundException("Skill not found.");
@@ -155,9 +165,11 @@ namespace IRAS.Application.Modules.SkillTaxonomy
             skill.Category = category;
             skill.Description = request.Description;
             await _db.SaveChangesAsync();
+
+            await _audit.LogAsync(adminId, "SkillUpdated", EntityType, skillId, CancellationToken.None);
         }
 
-        public async Task DeleteAsync(int skillId)
+        public async Task DeleteAsync(int adminId, int skillId)
         {
             var skill = await _db.Skills.Include(s => s.Aliases)
                 .FirstOrDefaultAsync(s => s.SkillId == skillId)
@@ -174,9 +186,11 @@ namespace IRAS.Application.Modules.SkillTaxonomy
             _db.SkillAliases.RemoveRange(skill.Aliases);
             _db.Skills.Remove(skill);
             await _db.SaveChangesAsync();
+
+            await _audit.LogAsync(adminId, "SkillDeleted", EntityType, skillId, CancellationToken.None);
         }
 
-        public async Task<SkillAliasDto> AddAliasAsync(int skillId, AddAliasRequest request)
+        public async Task<SkillAliasDto> AddAliasAsync(int adminId, int skillId, AddAliasRequest request)
         {
             var skillExists = await _db.Skills.AnyAsync(s => s.SkillId == skillId);
             if (!skillExists) throw new KeyNotFoundException("Skill not found.");
@@ -202,19 +216,22 @@ namespace IRAS.Application.Modules.SkillTaxonomy
             _db.SkillAliases.Add(alias);
             await _db.SaveChangesAsync();
 
+            await _audit.LogAsync(adminId, "SkillAliasAdded", EntityType, skillId, CancellationToken.None);
             return new SkillAliasDto
             {
                 AliasId = alias.AliasId, AliasText = alias.AliasText, Source = alias.Source.ToString()
             };
         }
 
-        public async Task DeleteAliasAsync(int skillId, int aliasId)
+        public async Task DeleteAliasAsync(int adminId, int skillId, int aliasId)
         {
             var alias = await _db.SkillAliases
                 .FirstOrDefaultAsync(a => a.AliasId == aliasId && a.SkillId == skillId)
                 ?? throw new KeyNotFoundException("Alias not found for this skill.");
             _db.SkillAliases.Remove(alias);
             await _db.SaveChangesAsync();
+
+            await _audit.LogAsync(adminId, "SkillAliasDeleted", EntityType, skillId, CancellationToken.None);
         }
 
         // ---- helpers ----
