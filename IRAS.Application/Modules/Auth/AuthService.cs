@@ -27,7 +27,12 @@ namespace IRAS.Application.Modules.Auth
 
         public async Task<AuthResponse> RegisterAsync(RegisterRequest request)
         {
-            if (request.Role == UserRole.Admin)
+            // RegisterRequest.Validate() (IValidatableObject) already rejects anything that
+            // doesn't parse to a defined UserRole before this service method is ever reached,
+            // so this parse cannot fail in practice — it just recovers the typed value.
+            var role = ParseEnum<UserRole>(request.Role, nameof(request.Role));
+
+            if (role == UserRole.Admin)
                 throw new InvalidOperationException("Admin accounts cannot be self-registered.");
 
             var exists = await _db.Users.AnyAsync(u => u.Email == request.Email);
@@ -38,7 +43,7 @@ namespace IRAS.Application.Modules.Auth
             {
                 Email = request.Email,
                 PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Password),
-                Role = request.Role,
+                Role = role,
                 IsActive = true
             };
 
@@ -49,7 +54,7 @@ namespace IRAS.Application.Modules.Auth
             _db.Users.Add(user);
             await _db.SaveChangesAsync();   // save first to get UserId
 
-            if (request.Role == UserRole.Candidate)
+            if (role == UserRole.Candidate)
             {
                 _db.CandidateProfiles.Add(new CandidateProfile
                 {
@@ -60,7 +65,7 @@ namespace IRAS.Application.Modules.Auth
                     TotalExpYears = 0
                 });
             }
-            else if (request.Role == UserRole.Employer)
+            else if (role == UserRole.Employer)
             {
                 _db.EmployerProfiles.Add(new EmployerProfile
                 {
@@ -128,6 +133,14 @@ namespace IRAS.Application.Modules.Auth
                 Token = new JwtSecurityTokenHandler().WriteToken(token),
                 ExpiresAt = expires
             };
+        }
+
+        private static TEnum ParseEnum<TEnum>(string value, string fieldName) where TEnum : struct, Enum
+        {
+            if (!Enum.TryParse<TEnum>(value, ignoreCase: true, out var result) || !Enum.IsDefined(result))
+                throw new ArgumentException(
+                    $"'{value}' is not a valid {fieldName}. Valid values: {string.Join(", ", Enum.GetNames<TEnum>())}.");
+            return result;
         }
     }
 }
