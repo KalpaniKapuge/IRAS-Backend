@@ -80,9 +80,20 @@ builder.Services.AddHttpClient<IRAS.Application.Common.Ai.IAiServiceClient,
     client.Timeout = TimeSpan.FromSeconds(opts.TimeoutSeconds);
 });
 
-// Storage + resume module
-builder.Services.AddSingleton<IRAS.Application.Common.Storage.IFileStorage,
-                              IRAS.Application.Common.Storage.LocalDiskFileStorage>();
+// Storage + resume/profile upload modules
+if (string.Equals(
+        builder.Configuration[$"{FileStorageOptions.SectionName}:Provider"],
+        "Supabase",
+        StringComparison.OrdinalIgnoreCase))
+{
+    builder.Services.AddHttpClient<IRAS.Application.Common.Storage.IFileStorage,
+                                   IRAS.Application.Common.Storage.SupabaseFileStorage>();
+}
+else
+{
+    builder.Services.AddSingleton<IRAS.Application.Common.Storage.IFileStorage,
+                                  IRAS.Application.Common.Storage.LocalDiskFileStorage>();
+}
 builder.Services.AddScoped<IResumeService, ResumeService>();
 
 // Scoring — shared by Module 6 (application ranking) and Module 8 (proactive matching)

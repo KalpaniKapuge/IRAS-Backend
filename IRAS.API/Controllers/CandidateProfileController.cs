@@ -38,6 +38,22 @@ namespace IRAS.API.Controllers
             return NoContent();
         }
 
+        [HttpPost("profile-picture")]
+        [Consumes("multipart/form-data")]
+        public async Task<IActionResult> UploadProfilePicture(int candidateId, CancellationToken ct)
+        {
+            var deny = CheckAccess(candidateId); if (deny != null) return deny;
+
+            var file = Request.Form.Files.GetFile("file")
+                ?? Request.Form.Files.GetFile("profilePicture")
+                ?? Request.Form.Files.FirstOrDefault();
+
+            if (file is null)
+                return BadRequest(new { message = "Profile picture file is required." });
+
+            return Ok(await _service.UploadProfilePictureAsync(candidateId, file, ct));
+        }
+
         [HttpPost("education")]
         public async Task<IActionResult> AddEducation(int candidateId, EducationDto dto)
         {
@@ -85,10 +101,46 @@ namespace IRAS.API.Controllers
         }
 
         [HttpPost("certifications")]
+        [Consumes("application/json")]
         public async Task<IActionResult> AddCertification(int candidateId, CertificationDto dto)
         {
             var deny = CheckAccess(candidateId); if (deny != null) return deny;
             return Ok(await _service.AddCertificationAsync(candidateId, dto));
+        }
+
+        [HttpPost("certifications")]
+        [Consumes("multipart/form-data")]
+        public async Task<IActionResult> AddCertificationWithFile(
+            int candidateId,
+            [FromForm] CertificationUploadRequest request,
+            CancellationToken ct)
+        {
+            var deny = CheckAccess(candidateId); if (deny != null) return deny;
+
+            request.File ??= Request.Form.Files.GetFile("file");
+            request.CertificateFile ??= Request.Form.Files.GetFile("certificateFile")
+                ?? Request.Form.Files.FirstOrDefault();
+
+            return Ok(await _service.AddCertificationAsync(candidateId, request, ct));
+        }
+
+        [HttpPost("certifications/{certificationId:int}/file")]
+        [Consumes("multipart/form-data")]
+        public async Task<IActionResult> UploadCertificationFile(
+            int candidateId,
+            int certificationId,
+            CancellationToken ct)
+        {
+            var deny = CheckAccess(candidateId); if (deny != null) return deny;
+
+            var file = Request.Form.Files.GetFile("file")
+                ?? Request.Form.Files.GetFile("certificateFile")
+                ?? Request.Form.Files.FirstOrDefault();
+
+            if (file is null)
+                return BadRequest(new { message = "Certificate file is required." });
+
+            return Ok(await _service.UploadCertificationFileAsync(candidateId, certificationId, file, ct));
         }
 
         [HttpDelete("certifications/{certificationId:int}")]

@@ -13,6 +13,7 @@ namespace IRAS.Domain.Entities.Candidate
         public string? Citizenship { get; set; }
         public string? Phone { get; set; }
         public string? Headline { get; set; }
+        public string? ProfilePictureUrl { get; set; }
         public decimal TotalExpYears { get; set; }
         public EducationLevel EducationLevel { get; set; }
         public bool OptInMatching { get; set; } = true;

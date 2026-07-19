@@ -1,5 +1,7 @@
 // IRAS.Application/Modules/Candidates/CandidateProfileService.cs
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Http;
+using IRAS.Application.Common.Storage;
 using IRAS.Application.Modules.Candidates.DTOs;
 using IRAS.Domain.Entities.Candidate;
 using IRAS.Domain.Entities.Skills;
@@ -10,8 +12,42 @@ namespace IRAS.Application.Modules.Candidates
 {
     public class CandidateProfileService : ICandidateProfileService
     {
+        private const long MaxProfilePictureBytes = 2 * 1024 * 1024;
+        private const long MaxCertificateBytes = 10 * 1024 * 1024;
+
+        private static readonly HashSet<string> ProfilePictureExtensions = new(StringComparer.OrdinalIgnoreCase)
+        {
+            ".jpg", ".jpeg", ".png", ".webp"
+        };
+
+        private static readonly HashSet<string> ProfilePictureContentTypes = new(StringComparer.OrdinalIgnoreCase)
+        {
+            "image/jpeg", "image/png", "image/webp"
+        };
+
+        private static readonly HashSet<string> CertificateExtensions = new(StringComparer.OrdinalIgnoreCase)
+        {
+            ".pdf", ".jpg", ".jpeg", ".png", ".webp", ".doc", ".docx"
+        };
+
+        private static readonly HashSet<string> CertificateContentTypes = new(StringComparer.OrdinalIgnoreCase)
+        {
+            "application/pdf",
+            "image/jpeg",
+            "image/png",
+            "image/webp",
+            "application/msword",
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        };
+
         private readonly IrasDbContext _db;
-        public CandidateProfileService(IrasDbContext db) => _db = db;
+        private readonly IFileStorage _storage;
+
+        public CandidateProfileService(IrasDbContext db, IFileStorage storage)
+        {
+            _db = db;
+            _storage = storage;
+        }
 
         public async Task<CandidateProfileDto> GetProfileAsync(int candidateId)
         {
@@ -39,6 +75,22 @@ namespace IRAS.Application.Modules.Candidates
             profile.OptInMatching = request.OptInMatching;
 
             await _db.SaveChangesAsync();
+        }
+
+        public async Task<CandidateProfileDto> UploadProfilePictureAsync(int candidateId, IFormFile file, CancellationToken ct)
+        {
+            var profile = await GetOwnedProfileAsync(candidateId, ct);
+            ValidateUpload(file, MaxProfilePictureBytes, ProfilePictureExtensions, ProfilePictureContentTypes, "Profile picture");
+
+            var oldPath = profile.ProfilePictureUrl;
+            var storedPath = await SaveUploadAsync(file, $"candidate-profiles/{candidateId}/profile-picture", ct);
+
+            profile.ProfilePictureUrl = storedPath;
+            await _db.SaveChangesAsync(ct);
+
+            await DeleteStoredFileIfPresentAsync(oldPath, ct);
+
+            return await GetProfileAsync(candidateId);
         }
 
         public async Task<EducationDto> AddEducationAsync(int candidateId, EducationDto dto)
@@ -187,6 +239,57 @@ namespace IRAS.Application.Modules.Candidates
             return dto;
         }
 
+        public async Task<CertificationDto> AddCertificationAsync(int candidateId, CertificationUploadRequest request, CancellationToken ct)
+        {
+            await GetOwnedProfileAsync(candidateId, ct);
+
+            var file = request.File ?? request.CertificateFile;
+            string? storedPath = null;
+            if (file is not null)
+            {
+                ValidateCertificateFile(file);
+                storedPath = await SaveUploadAsync(file, $"candidate-profiles/{candidateId}/certifications", ct);
+            }
+
+            var entity = new Certification
+            {
+                CandidateId = candidateId,
+                Name = request.Name,
+                IssuingOrg = request.IssuingOrg,
+                IssueDate = request.IssueDate,
+                ExpiryDate = request.ExpiryDate,
+                CertificateFileUrl = storedPath,
+                CertificateFileName = file?.FileName,
+                CertificateContentType = file?.ContentType
+            };
+            _db.Certifications.Add(entity);
+            await _db.SaveChangesAsync(ct);
+
+            return MapCertification(entity);
+        }
+
+        public async Task<CertificationDto> UploadCertificationFileAsync(
+            int candidateId, int certificationId, IFormFile file, CancellationToken ct)
+        {
+            var entity = await _db.Certifications
+                .FirstOrDefaultAsync(c => c.CertificationId == certificationId && c.CandidateId == candidateId, ct)
+                ?? throw new KeyNotFoundException("Certification record not found.");
+
+            ValidateCertificateFile(file);
+
+            var oldPath = entity.CertificateFileUrl;
+            var storedPath = await SaveUploadAsync(file, $"candidate-profiles/{candidateId}/certifications", ct);
+
+            entity.CertificateFileUrl = storedPath;
+            entity.CertificateFileName = file.FileName;
+            entity.CertificateContentType = file.ContentType;
+            await _db.SaveChangesAsync(ct);
+
+            await DeleteStoredFileIfPresentAsync(oldPath, ct);
+
+            return MapCertification(entity);
+        }
+
         public async Task DeleteCertificationAsync(int candidateId, int certificationId)
         {
             var entity = await _db.Certifications
@@ -194,6 +297,7 @@ namespace IRAS.Application.Modules.Candidates
                 ?? throw new KeyNotFoundException("Certification record not found.");
             _db.Certifications.Remove(entity);
             await _db.SaveChangesAsync();
+            await DeleteStoredFileIfPresentAsync(entity.CertificateFileUrl, CancellationToken.None);
         }
 
         public async Task UpsertSkillAsync(int candidateId, UpsertCandidateSkillRequest request)
@@ -252,6 +356,55 @@ namespace IRAS.Application.Modules.Candidates
                 ?? throw new KeyNotFoundException("Candidate profile not found.");
         }
 
+        private async Task<CandidateProfile> GetOwnedProfileAsync(int candidateId, CancellationToken ct)
+        {
+            return await _db.CandidateProfiles.FirstOrDefaultAsync(c => c.CandidateId == candidateId, ct)
+                ?? throw new KeyNotFoundException("Candidate profile not found.");
+        }
+
+        private static void ValidateCertificateFile(IFormFile file)
+        {
+            ValidateUpload(file, MaxCertificateBytes, CertificateExtensions, CertificateContentTypes, "Certificate file");
+        }
+
+        private static void ValidateUpload(
+            IFormFile file,
+            long maxBytes,
+            HashSet<string> allowedExtensions,
+            HashSet<string> allowedContentTypes,
+            string label)
+        {
+            if (file.Length == 0)
+                throw new ArgumentException($"{label} is empty.");
+
+            if (file.Length > maxBytes)
+                throw new ArgumentException($"{label} exceeds the {maxBytes / 1024 / 1024} MB limit.");
+
+            var extension = Path.GetExtension(file.FileName);
+            if (!allowedExtensions.Contains(extension))
+                throw new ArgumentException($"{label} has an unsupported file extension.");
+
+            if (!allowedContentTypes.Contains(file.ContentType))
+                throw new ArgumentException($"{label} has an unsupported content type.");
+        }
+
+        private async Task<string> SaveUploadAsync(IFormFile file, string folder, CancellationToken ct)
+        {
+            var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
+            var storedName = $"{Guid.NewGuid():N}{extension}";
+
+            await using var stream = file.OpenReadStream();
+            return await _storage.SaveAsync(stream, folder, storedName, ct);
+        }
+
+        private async Task DeleteStoredFileIfPresentAsync(string? storedPath, CancellationToken ct)
+        {
+            if (string.IsNullOrWhiteSpace(storedPath))
+                return;
+
+            await _storage.DeleteAsync(storedPath, ct);
+        }
+
         private async Task RecalculateTotalExperienceAsync(int candidateId)
         {
             var experiences = await _db.WorkExperiences
@@ -278,6 +431,7 @@ namespace IRAS.Application.Modules.Candidates
             Citizenship = p.Citizenship,
             Phone = p.Phone,
             Headline = p.Headline,
+            ProfilePictureUrl = p.ProfilePictureUrl,
             TotalExpYears = p.TotalExpYears,
             EducationLevel = p.EducationLevel.ToString(),
             OptInMatching = p.OptInMatching,
@@ -294,13 +448,27 @@ namespace IRAS.Application.Modules.Candidates
             Certifications = p.Certifications.Select(c => new CertificationDto
             {
                 CertificationId = c.CertificationId, Name = c.Name, IssuingOrg = c.IssuingOrg,
-                IssueDate = c.IssueDate, ExpiryDate = c.ExpiryDate
+                IssueDate = c.IssueDate, ExpiryDate = c.ExpiryDate,
+                CertificateFileUrl = c.CertificateFileUrl, CertificateFileName = c.CertificateFileName,
+                CertificateContentType = c.CertificateContentType
             }).ToList(),
             Skills = p.CandidateSkills.Select(cs => new CandidateSkillDto
             {
                 SkillId = cs.SkillId, SkillName = cs.Skill.SkillName, Proficiency = cs.Proficiency.ToString(),
                 YearsExp = cs.YearsExp, Source = cs.Source.ToString(), IsVerified = cs.IsVerified
             }).ToList()
+        };
+
+        private static CertificationDto MapCertification(Certification c) => new()
+        {
+            CertificationId = c.CertificationId,
+            Name = c.Name,
+            IssuingOrg = c.IssuingOrg,
+            IssueDate = c.IssueDate,
+            ExpiryDate = c.ExpiryDate,
+            CertificateFileUrl = c.CertificateFileUrl,
+            CertificateFileName = c.CertificateFileName,
+            CertificateContentType = c.CertificateContentType
         };
     }
 }

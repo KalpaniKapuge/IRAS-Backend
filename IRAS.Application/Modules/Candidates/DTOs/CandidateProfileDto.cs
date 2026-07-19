@@ -11,6 +11,7 @@ namespace IRAS.Application.Modules.Candidates.DTOs
         public string? Citizenship { get; set; }
         public string? Phone { get; set; }
         public string? Headline { get; set; }
+        public string? ProfilePictureUrl { get; set; }
         public decimal TotalExpYears { get; set; }
         public string EducationLevel { get; set; } = null!;
         public bool OptInMatching { get; set; }
@@ -98,6 +99,24 @@ namespace IRAS.Application.Modules.Candidates.DTOs
 
         public DateTime? IssueDate { get; set; }
         public DateTime? ExpiryDate { get; set; }
+        public string? CertificateFileUrl { get; set; }
+        public string? CertificateFileName { get; set; }
+        public string? CertificateContentType { get; set; }
+    }
+
+    public class CertificationUploadRequest
+    {
+        [Required, StringLength(200)]
+        public string Name { get; set; } = null!;
+
+        [StringLength(150)]
+        public string? IssuingOrg { get; set; }
+
+        public DateTime? IssueDate { get; set; }
+        public DateTime? ExpiryDate { get; set; }
+
+        public Microsoft.AspNetCore.Http.IFormFile? File { get; set; }
+        public Microsoft.AspNetCore.Http.IFormFile? CertificateFile { get; set; }
     }
 
     public class CandidateSkillDto
