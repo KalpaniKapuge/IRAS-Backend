@@ -19,12 +19,15 @@ namespace IRAS.Domain.Enums
 
     public enum ApplicationStatus { Applied, Screened, Shortlisted, Interview, Rejected, Hired, Withdrawn }
 
+    public enum InterviewMode { Onsite, Remote, Phone }
+    public enum InterviewStatus { Scheduled, Completed, Cancelled, NoShow }
+
     public enum ApprovalStatus { PendingReview, Approved, Edited, Rejected }
     public enum DeliveryStatus { Queued, Sent, Failed }
     public enum DeliveryChannel { Email, InApp, Both }
 
-    public enum NotificationType { JobMatch, ApplicationUpdate, Feedback, System }
-    public enum RelatedEntityType { Job, Application, Feedback, Candidate }
+    public enum NotificationType { JobMatch, ApplicationUpdate, Feedback, System, Interview }
+    public enum RelatedEntityType { Job, Application, Feedback, Candidate, Interview }
 
     public enum ChatSender { User, Bot }
     public enum KnowledgeCategory { FAQ, PolicyGuideline, SkillAdvice, PlatformHowTo }

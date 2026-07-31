@@ -6,12 +6,14 @@ using IRAS.Application.Modules.Applications;
 using IRAS.Application.Modules.Applications.DTOs;
 using IRAS.Application.Modules.Feedback;
 using IRAS.Application.Modules.Feedback.DTOs;
+using IRAS.Application.Modules.Interviews;
+using IRAS.Application.Modules.Interviews.DTOs;
 
 namespace IRAS.API.Controllers
 {
-    // Ranked applicant view, status changes, and feedback review for a job's owning
-    // employer. Candidate-facing application routes live in ApplicationsController
-    // (api/applications).
+    // Ranked applicant view, status changes, feedback review, and interview scheduling
+    // for a job's owning employer. Candidate-facing application routes live in
+    // ApplicationsController (api/applications).
     [ApiController]
     [Route("api/employers/{employerId:int}/jobs/{jobId:int}/applicants")]
     [Authorize]
@@ -19,11 +21,13 @@ namespace IRAS.API.Controllers
     {
         private readonly IApplicationService _applications;
         private readonly IFeedbackService _feedback;
+        private readonly IInterviewService _interviews;
 
-        public EmployerApplicationsController(IApplicationService applications, IFeedbackService feedback)
+        public EmployerApplicationsController(IApplicationService applications, IFeedbackService feedback, IInterviewService interviews)
         {
             _applications = applications;
             _feedback = feedback;
+            _interviews = interviews;
         }
 
         private IActionResult? CheckAccess(int employerId)
@@ -65,6 +69,49 @@ namespace IRAS.API.Controllers
         {
             var deny = CheckAccess(employerId); if (deny != null) return deny;
             return Ok(await _feedback.ReviewAsync(employerId, applicationId, request, ct));
+        }
+
+        // ---- Interview scheduling ----
+
+        [HttpGet("{applicationId:int}/interviews")]
+        public async Task<IActionResult> GetInterviews(int employerId, int jobId, int applicationId, CancellationToken ct)
+        {
+            var deny = CheckAccess(employerId); if (deny != null) return deny;
+            return Ok(await _interviews.GetForApplicationAsync(employerId, applicationId, ct));
+        }
+
+        [HttpPost("{applicationId:int}/interviews")]
+        public async Task<IActionResult> ScheduleInterview(
+            int employerId, int jobId, int applicationId, ScheduleInterviewRequest request, CancellationToken ct)
+        {
+            var deny = CheckAccess(employerId); if (deny != null) return deny;
+            return Ok(await _interviews.ScheduleAsync(employerId, applicationId, request, ct));
+        }
+
+        [HttpPut("{applicationId:int}/interviews/{interviewId:int}")]
+        public async Task<IActionResult> RescheduleInterview(
+            int employerId, int jobId, int applicationId, int interviewId, RescheduleInterviewRequest request, CancellationToken ct)
+        {
+            var deny = CheckAccess(employerId); if (deny != null) return deny;
+            return Ok(await _interviews.RescheduleAsync(employerId, interviewId, request, ct));
+        }
+
+        [HttpPost("{applicationId:int}/interviews/{interviewId:int}/cancel")]
+        public async Task<IActionResult> CancelInterview(
+            int employerId, int jobId, int applicationId, int interviewId, CancelInterviewRequest request, CancellationToken ct)
+        {
+            var deny = CheckAccess(employerId); if (deny != null) return deny;
+            await _interviews.CancelAsync(employerId, interviewId, request, ct);
+            return NoContent();
+        }
+
+        [HttpPut("{applicationId:int}/interviews/{interviewId:int}/outcome")]
+        public async Task<IActionResult> UpdateInterviewOutcome(
+            int employerId, int jobId, int applicationId, int interviewId, UpdateInterviewOutcomeRequest request, CancellationToken ct)
+        {
+            var deny = CheckAccess(employerId); if (deny != null) return deny;
+            await _interviews.UpdateOutcomeAsync(employerId, interviewId, request, ct);
+            return NoContent();
         }
     }
 }

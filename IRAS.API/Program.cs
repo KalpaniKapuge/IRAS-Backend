@@ -20,6 +20,7 @@ using IRAS.Application.Modules.Auth;
 using IRAS.Application.Modules.Candidates;
 using IRAS.Application.Modules.Chat;
 using IRAS.Application.Modules.Feedback;
+using IRAS.Application.Modules.Interviews;
 using IRAS.Application.Modules.Jobs;
 using IRAS.Application.Modules.KnowledgeBase;
 using IRAS.Application.Modules.Matching;
@@ -136,6 +137,11 @@ builder.Services.AddScoped<ISkillGapService, SkillGapService>();
 builder.Services.AddScoped<IFeedbackGenerator, TemplateFeedbackGenerator>();
 builder.Services.AddScoped<IFeedbackService, FeedbackService>();
 builder.Services.AddScoped<IApplicationService, ApplicationService>();
+
+// Interview Scheduling — depends on IApplicationService (advances an application to
+// ApplicationStatus.Interview on first booking) and INotificationService (in-app +
+// email notification to the candidate on schedule/reschedule/cancel).
+builder.Services.AddScoped<IInterviewService, InterviewService>();
 
 // Chatbot (Module 10) — real Google Gemini API call. RuleBasedChatResponder remains in
 // the codebase as the deterministic, zero-cost baseline (same swappable pattern as

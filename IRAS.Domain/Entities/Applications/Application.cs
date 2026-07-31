@@ -27,6 +27,7 @@ namespace IRAS.Domain.Entities.Applications
         public Resume Resume { get; set; } = null!;
         public ICollection<SkillGap> SkillGaps { get; set; } = new List<SkillGap>();
         public ICollection<ApplicationStatusHistory> StatusHistory { get; set; } = new List<ApplicationStatusHistory>();
+        public ICollection<Interview> Interviews { get; set; } = new List<Interview>();
         public Feedback.Feedback? Feedback { get; set; }
     }
 }

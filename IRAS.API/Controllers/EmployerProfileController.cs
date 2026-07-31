@@ -2,6 +2,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using IRAS.API.Extensions;
+using IRAS.Application.Modules.Interviews;
 using IRAS.Application.Modules.Jobs;
 using IRAS.Application.Modules.Jobs.DTOs;
 
@@ -13,7 +14,13 @@ namespace IRAS.API.Controllers
     public class EmployerProfileController : ControllerBase
     {
         private readonly IJobService _service;
-        public EmployerProfileController(IJobService service) => _service = service;
+        private readonly IInterviewService _interviews;
+
+        public EmployerProfileController(IJobService service, IInterviewService interviews)
+        {
+            _service = service;
+            _interviews = interviews;
+        }
 
         private IActionResult? CheckAccess(int employerId)
         {
@@ -36,6 +43,16 @@ namespace IRAS.API.Controllers
             var deny = CheckAccess(employerId); if (deny != null) return deny;
             await _service.UpdateEmployerProfileAsync(employerId, request);
             return NoContent();
+        }
+
+        // All interviews across every job this employer owns, soonest first — a
+        // dashboard-style view distinct from the per-application list in
+        // EmployerApplicationsController.
+        [HttpGet("interviews")]
+        public async Task<IActionResult> GetInterviews(int employerId, CancellationToken ct)
+        {
+            var deny = CheckAccess(employerId); if (deny != null) return deny;
+            return Ok(await _interviews.GetForEmployerAsync(employerId, ct));
         }
     }
 }

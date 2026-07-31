@@ -30,6 +30,7 @@ namespace IRAS.Infrastructure.Data
         public DbSet<JobRequiredSkill> JobRequiredSkills => Set<JobRequiredSkill>();
         public DbSet<Application> Applications => Set<Application>();
         public DbSet<ApplicationStatusHistory> ApplicationStatusHistories => Set<ApplicationStatusHistory>();
+        public DbSet<Interview> Interviews => Set<Interview>();
         public DbSet<SkillGap> SkillGaps => Set<SkillGap>();
         public DbSet<JobMatch> JobMatches => Set<JobMatch>();
         public DbSet<Feedback> Feedbacks => Set<Feedback>();
@@ -107,6 +108,8 @@ namespace IRAS.Infrastructure.Data
                 .HasForeignKey(f => f.ApprovedBy).OnDelete(DeleteBehavior.Restrict);
             b.Entity<KnowledgeBase>().HasOne(k => k.UpdatedByUser).WithMany()
                 .HasForeignKey(k => k.UpdatedBy).OnDelete(DeleteBehavior.Restrict);
+            b.Entity<Interview>().HasOne(i => i.ScheduledByUser).WithMany()
+                .HasForeignKey(i => i.ScheduledBy).OnDelete(DeleteBehavior.Restrict);
 
             // ---- Store enums as strings, not ints (readability in SQL Server) ----
             foreach (var entityType in b.Model.GetEntityTypes())
