@@ -63,7 +63,26 @@ builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<ICandidateProfileService, CandidateProfileService>();
 builder.Services.AddScoped<ISkillTaxonomyService, SkillTaxonomyService>();
 builder.Services.AddScoped<IJobService, JobService>();
-builder.Services.AddScoped<IJdGenerator, TemplateJdGenerator>();
+
+// JD generation — real Google Gemini API call (Module 5), chosen for its genuinely free
+// tier (no billing card required). TemplateJdGenerator, ClaudeJdGenerator, and
+// GptJdGenerator remain in the codebase as alternative IJdGenerator implementations
+// (Template is the deterministic baseline for the thesis's evaluation chapter; Claude and
+// GPT are working alternative providers), but GeminiJdGenerator is what actually serves
+// requests. Same IJdGenerator contract across all four — swapping which one is active is
+// a one-line change here, nothing else in the app depends on which provider is behind it.
+// No official Google-maintained C# SDK exists for this endpoint, so GeminiJdGenerator
+// calls the documented REST API directly — same typed-HttpClient pattern as the Python
+// AI service below.
+builder.Services.Configure<GeminiOptions>(
+    builder.Configuration.GetSection(GeminiOptions.SectionName));
+builder.Services.AddHttpClient<IJdGenerator, GeminiJdGenerator>((sp, client) =>
+{
+    var opts = builder.Configuration.GetSection(GeminiOptions.SectionName).Get<GeminiOptions>()
+        ?? new GeminiOptions();
+    client.BaseAddress = new Uri(opts.BaseUrl);
+    client.Timeout = TimeSpan.FromSeconds(60);
+});
 
 // Options
 builder.Services.Configure<FileStorageOptions>(
@@ -118,12 +137,21 @@ builder.Services.AddScoped<IFeedbackGenerator, TemplateFeedbackGenerator>();
 builder.Services.AddScoped<IFeedbackService, FeedbackService>();
 builder.Services.AddScoped<IApplicationService, ApplicationService>();
 
-// Chatbot (Module 10) — RuleBasedChatResponder is the dev-safe default (no LLM API key
-// needed), same swappable pattern as IJdGenerator/IFeedbackGenerator. ChatService reuses
-// ISkillGapService/IApplicationService/IJobMatchingService/INotificationService rather
-// than re-querying the database.
+// Chatbot (Module 10) — real Google Gemini API call. RuleBasedChatResponder remains in
+// the codebase as the deterministic, zero-cost baseline (same swappable pattern as
+// IJdGenerator), but GeminiChatResponder is what actually serves requests. Both share
+// ChatScopeGate for off-topic refusal, so that guarantee holds regardless of which one is
+// active. ChatService reuses ISkillGapService/IApplicationService/IJobMatchingService/
+// INotificationService rather than re-querying the database. Reuses the same GeminiOptions
+// binding as GeminiJdGenerator (configured above).
 builder.Services.AddScoped<IKnowledgeBaseService, KnowledgeBaseService>();
-builder.Services.AddScoped<IChatResponder, RuleBasedChatResponder>();
+builder.Services.AddHttpClient<IChatResponder, GeminiChatResponder>((sp, client) =>
+{
+    var opts = builder.Configuration.GetSection(GeminiOptions.SectionName).Get<GeminiOptions>()
+        ?? new GeminiOptions();
+    client.BaseAddress = new Uri(opts.BaseUrl);
+    client.Timeout = TimeSpan.FromSeconds(60);
+});
 builder.Services.AddScoped<IChatService, ChatService>();
 
 // Admin (Module 11) — user management, cross-employer job moderation, and reporting.

@@ -1,87 +1,33 @@
 // IRAS.Application/Modules/Chat/RuleBasedChatResponder.cs
 using System.Text;
-using System.Text.RegularExpressions;
 
 namespace IRAS.Application.Modules.Chat
 {
-    // Deterministic, keyword/intent-based responder — the baseline behind IChatResponder.
-    // Two jobs, in order: (1) refuse anything outside the recruitment-platform domain,
-    // (2) for in-scope messages, answer from the candidate's own data or the knowledge
-    // base. Intentionally simple and auditable — precision over recall, same philosophy
-    // as the AI service's resume skill-detector (a false "I can help with that" on an
-    // off-topic question is worse than an occasional unnecessary refusal).
+    // Deterministic, keyword/intent-based responder — the zero-cost baseline behind
+    // IChatResponder, and the comparison point for the thesis's evaluation chapter against
+    // GeminiChatResponder. Scope gating (greeting/ack/capabilities/off-topic refusal) is
+    // shared with the LLM-backed responder via ChatScopeGate — only the answering strategy
+    // for in-scope messages differs here (fixed templates vs a real LLM call).
     public class RuleBasedChatResponder : IChatResponder
     {
         public string Name => "RuleBased";
         public bool IsAi => false;
 
-        private static readonly Regex WordPattern = new(@"[a-zA-Z']+", RegexOptions.Compiled);
-
-        // The allow-list that gates whether a message is even considered. Deliberately
-        // curated and static rather than derived from free text, so the gate can't be
-        // widened by accident (e.g. by knowledge-base prose containing common words).
-        private static readonly HashSet<string> DomainVocabulary = new(StringComparer.OrdinalIgnoreCase)
-        {
-            "resume", "resumes", "cv", "upload", "uploaded", "parse", "parsed", "parsing",
-            "skill", "skills", "gap", "gaps", "missing",
-            "application", "applications", "apply", "applied", "applying",
-            "job", "jobs", "vacancy", "vacancies", "position", "positions", "role", "roles",
-            "employer", "employers", "company", "companies",
-            "candidate", "candidates", "profile", "profiles", "account",
-            "match", "matches", "matching", "matched",
-            "score", "scores", "scoring", "rank", "ranking", "ranked",
-            "interview", "interviews", "shortlist", "shortlisted",
-            "feedback", "reject", "rejected", "rejection", "hire", "hired", "hiring",
-            "notification", "notifications", "unread", "status", "update", "updates", "progress",
-            "register", "registration", "login", "password", "email",
-            "certification", "certifications", "education", "experience", "qualification", "qualifications",
-            "chatbot", "chat", "assistant", "platform", "system", "iras",
-            "recruitment", "recruiting", "recruiter",
-            "requirement", "requirements", "qualify", "qualified", "suitable", "fit",
-            "learn", "improve", "improvement", "advice", "recommend", "recommendation", "help"
-        };
-
-        private static readonly HashSet<string> Stopwords = new(StringComparer.OrdinalIgnoreCase)
-        {
-            "the", "a", "an", "is", "are", "was", "were", "do", "does", "did", "how", "what",
-            "when", "where", "why", "who", "which", "i", "my", "me", "to", "for", "of", "in",
-            "on", "at", "and", "or", "you", "your", "can", "could", "will", "would", "should",
-            "it", "its", "this", "that", "these", "those", "be", "have", "has", "had", "with",
-            "about", "get", "got", "am", "please"
-        };
-
-        private static readonly HashSet<string> GreetingWords = new(StringComparer.OrdinalIgnoreCase)
-            { "hi", "hello", "hey" };
-
-        private static readonly HashSet<string> AckWords = new(StringComparer.OrdinalIgnoreCase)
-            { "thanks", "thank", "thx", "ok", "okay", "cool", "great", "nice", "awesome" };
-
         public Task<ChatReply> RespondAsync(string message, ChatContext context, CancellationToken ct)
         {
-            var tokens = Tokenize(message);
+            var tokens = ChatScopeGate.Tokenize(message);
 
-            if (tokens.Count <= 4 && tokens.Overlaps(GreetingWords))
-                return Task.FromResult(new ChatReply(
-                    "Hi! I'm the IRAS assistant. I can help with your resume, applications, skill gaps, " +
-                    "job matches, and how this platform works — what would you like to know?",
-                    "Greeting"));
+            if (ChatScopeGate.IsGreeting(tokens))
+                return Task.FromResult(new ChatReply(ChatScopeGate.GreetingMessage, "Greeting"));
 
-            if (tokens.Count <= 4 && tokens.Overlaps(AckWords))
-                return Task.FromResult(new ChatReply(
-                    "You're welcome! Anything else about your resume, applications, or this platform I can help with?",
-                    "Acknowledgement"));
+            if (ChatScopeGate.IsAcknowledgement(tokens))
+                return Task.FromResult(new ChatReply(ChatScopeGate.AcknowledgementMessage, "Acknowledgement"));
 
-            var isCapabilitiesQuery = (tokens.Contains("help") && tokens.Count <= 3)
-                || message.Contains("what can you do", StringComparison.OrdinalIgnoreCase);
-            if (isCapabilitiesQuery)
+            if (ChatScopeGate.IsCapabilitiesQuery(tokens, message))
                 return Task.FromResult(new ChatReply(BuildCapabilitiesMessage(context), "Capabilities"));
 
-            if (!tokens.Overlaps(DomainVocabulary))
-                return Task.FromResult(new ChatReply(
-                    "I can only help with questions about this recruitment platform — your resume, " +
-                    "applications, skill gaps, job matches, or how the system works. I'm not able to help " +
-                    "with anything outside that. Try asking about your profile, applications, or skills instead.",
-                    "OutOfScope"));
+            if (!ChatScopeGate.IsInScope(tokens))
+                return Task.FromResult(new ChatReply(ChatScopeGate.OutOfScopeMessage, "OutOfScope"));
 
             // ---- knowledge-base lookup (checked before the personal-data intents below) ----
             //
@@ -193,7 +139,7 @@ namespace IRAS.Application.Modules.Chat
 
             foreach (var entry in kb)
             {
-                var titleTokens = Tokenize(entry.Title);
+                var titleTokens = ChatScopeGate.Tokenize(entry.Title);
                 if (titleTokens.Count == 0) continue;
 
                 var overlap = titleTokens.Count(t => messageTokens.Contains(t));
@@ -210,14 +156,6 @@ namespace IRAS.Application.Modules.Chat
             }
 
             return best;
-        }
-
-        private static HashSet<string> Tokenize(string text)
-        {
-            return WordPattern.Matches(text)
-                .Select(m => m.Value.ToLowerInvariant())
-                .Where(w => w.Length > 1 && !Stopwords.Contains(w))
-                .ToHashSet();
         }
     }
 }
