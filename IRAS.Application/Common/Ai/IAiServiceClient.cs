@@ -16,7 +16,7 @@ namespace IRAS.Application.Common.Ai
 
     public record RankCandidateInput(int CandidateId, string ResumeText);
 
-    public record RankedResult(int CandidateId, decimal SemanticSimilarity);
+    public record RankedResult(int CandidateId, decimal SemanticSimilarity, string? FitLabel, decimal? FitScore);
 
     public record RankResult(bool Success, string? Error, List<RankedResult> Results);
 

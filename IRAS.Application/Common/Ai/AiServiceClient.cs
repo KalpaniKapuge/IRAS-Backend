@@ -75,7 +75,11 @@ namespace IRAS.Application.Common.Ai
                     return new RankResult(false, result.Error, new List<RankedResult>());
 
                 return new RankResult(true, null,
-                    result.Results.Select(r => new RankedResult(r.CandidateId, (decimal)r.SemanticSimilarity)).ToList());
+                    result.Results.Select(r => new RankedResult(
+                        r.CandidateId,
+                        (decimal)r.SemanticSimilarity,
+                        r.FitLabel,
+                        r.FitScore.HasValue ? (decimal)r.FitScore.Value : null)).ToList());
             }
             catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
             {
@@ -134,6 +138,8 @@ namespace IRAS.Application.Common.Ai
 
         private sealed record PyRankedResult(
             [property: JsonPropertyName("candidate_id")] int CandidateId,
-            [property: JsonPropertyName("semantic_similarity")] double SemanticSimilarity);
+            [property: JsonPropertyName("semantic_similarity")] double SemanticSimilarity,
+            [property: JsonPropertyName("fit_label")] string? FitLabel,
+            [property: JsonPropertyName("fit_score")] double? FitScore);
     }
 }
