@@ -14,6 +14,8 @@ namespace IRAS.Domain.Entities.Candidate
         public string? Phone { get; set; }
         public string? Headline { get; set; }
         public string? ProfilePictureUrl { get; set; }
+        public string? GithubUrl { get; set; }
+        public string? LinkedInUrl { get; set; }
         public decimal TotalExpYears { get; set; }
         public EducationLevel EducationLevel { get; set; }
         public bool OptInMatching { get; set; } = true;

@@ -62,19 +62,17 @@ builder.Services.AddScoped<IAuditLogService, AuditLogService>();
 
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<ICandidateProfileService, CandidateProfileService>();
+
+// CV builder — renders a candidate's existing profile data (education, experience,
+// certifications, skills already collected via CandidateProfileService) into a downloadable
+// PDF via QuestPDF, with template selection and per-CV section/item customization. No
+// external API dependency, unlike the Gemini-backed generators above.
+builder.Services.AddScoped<IRAS.Application.Modules.Cv.ICvPdfRenderer, IRAS.Application.Modules.Cv.CvPdfRenderer>();
+builder.Services.AddScoped<IRAS.Application.Modules.Cv.ICvService, IRAS.Application.Modules.Cv.CvService>();
 builder.Services.AddScoped<ISkillTaxonomyService, SkillTaxonomyService>();
 builder.Services.AddScoped<IJobService, JobService>();
 
-// JD generation — real Google Gemini API call (Module 5), chosen for its genuinely free
-// tier (no billing card required). TemplateJdGenerator, ClaudeJdGenerator, and
-// GptJdGenerator remain in the codebase as alternative IJdGenerator implementations
-// (Template is the deterministic baseline for the thesis's evaluation chapter; Claude and
-// GPT are working alternative providers), but GeminiJdGenerator is what actually serves
-// requests. Same IJdGenerator contract across all four — swapping which one is active is
-// a one-line change here, nothing else in the app depends on which provider is behind it.
-// No official Google-maintained C# SDK exists for this endpoint, so GeminiJdGenerator
-// calls the documented REST API directly — same typed-HttpClient pattern as the Python
-// AI service below.
+
 builder.Services.Configure<GeminiOptions>(
     builder.Configuration.GetSection(GeminiOptions.SectionName));
 builder.Services.AddHttpClient<IJdGenerator, GeminiJdGenerator>((sp, client) =>
@@ -131,11 +129,6 @@ builder.Services.AddScoped<IJobMatchingService, JobMatchingService>();
 
 builder.Services.AddScoped<ISkillGapService, SkillGapService>();
 
-// Skill gap explanation — real Google Gemini API call, same swappable pattern as
-// IJdGenerator. TemplateSkillGapExplainer remains as the deterministic baseline (thesis
-// evaluation chapter); GeminiSkillGapExplainer is what actually serves requests. Reuses the
-// GeminiOptions binding configured above. Registered before IApplicationService, which
-// depends on it directly (ApplyAsync calls it while building an application's skill gaps).
 builder.Services.AddHttpClient<ISkillGapExplainer, GeminiSkillGapExplainer>((sp, client) =>
 {
     var opts = builder.Configuration.GetSection(GeminiOptions.SectionName).Get<GeminiOptions>()
@@ -144,10 +137,6 @@ builder.Services.AddHttpClient<ISkillGapExplainer, GeminiSkillGapExplainer>((sp,
     client.Timeout = TimeSpan.FromSeconds(60);
 });
 
-// Feedback (Module 9) — real Google Gemini API call, same swappable pattern as
-// IJdGenerator. TemplateFeedbackGenerator remains as the deterministic baseline (thesis
-// evaluation chapter); GeminiFeedbackGenerator is what actually serves requests. Registered
-// before IApplicationService since ApplicationService depends on IFeedbackService.
 builder.Services.AddHttpClient<IFeedbackGenerator, GeminiFeedbackGenerator>((sp, client) =>
 {
     var opts = builder.Configuration.GetSection(GeminiOptions.SectionName).Get<GeminiOptions>()
@@ -158,18 +147,8 @@ builder.Services.AddHttpClient<IFeedbackGenerator, GeminiFeedbackGenerator>((sp,
 builder.Services.AddScoped<IFeedbackService, FeedbackService>();
 builder.Services.AddScoped<IApplicationService, ApplicationService>();
 
-// Interview Scheduling — depends on IApplicationService (advances an application to
-// ApplicationStatus.Interview on first booking) and INotificationService (in-app +
-// email notification to the candidate on schedule/reschedule/cancel).
 builder.Services.AddScoped<IInterviewService, InterviewService>();
 
-// Chatbot (Module 10) — real Google Gemini API call. RuleBasedChatResponder remains in
-// the codebase as the deterministic, zero-cost baseline (same swappable pattern as
-// IJdGenerator), but GeminiChatResponder is what actually serves requests. Both share
-// ChatScopeGate for off-topic refusal, so that guarantee holds regardless of which one is
-// active. ChatService reuses ISkillGapService/IApplicationService/IJobMatchingService/
-// INotificationService rather than re-querying the database. Reuses the same GeminiOptions
-// binding as GeminiJdGenerator (configured above).
 builder.Services.AddScoped<IKnowledgeBaseService, KnowledgeBaseService>();
 builder.Services.AddHttpClient<IChatResponder, GeminiChatResponder>((sp, client) =>
 {
@@ -180,9 +159,6 @@ builder.Services.AddHttpClient<IChatResponder, GeminiChatResponder>((sp, client)
 });
 builder.Services.AddScoped<IChatService, ChatService>();
 
-// Admin (Module 11) — user management, cross-employer job moderation, and reporting.
-// IAuditLogService itself is registered above; KnowledgeBaseService and
-// SkillTaxonomyService also write to it directly for their own admin-only mutations.
 builder.Services.AddScoped<IUserManagementService, UserManagementService>();
 builder.Services.AddScoped<IJobModerationService, JobModerationService>();
 builder.Services.AddScoped<IReportingService, ReportingService>();

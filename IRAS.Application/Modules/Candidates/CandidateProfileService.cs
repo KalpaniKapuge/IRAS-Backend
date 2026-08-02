@@ -71,6 +71,8 @@ namespace IRAS.Application.Modules.Candidates
             profile.Citizenship = request.Citizenship;
             profile.Phone = request.Phone;
             profile.Headline = request.Headline;
+            profile.GithubUrl = request.GithubUrl;
+            profile.LinkedInUrl = request.LinkedInUrl;
             profile.EducationLevel = ParseEnum<EducationLevel>(request.EducationLevel, nameof(request.EducationLevel));
             profile.OptInMatching = request.OptInMatching;
 
@@ -432,6 +434,8 @@ namespace IRAS.Application.Modules.Candidates
             Phone = p.Phone,
             Headline = p.Headline,
             ProfilePictureUrl = p.ProfilePictureUrl,
+            GithubUrl = p.GithubUrl,
+            LinkedInUrl = p.LinkedInUrl,
             TotalExpYears = p.TotalExpYears,
             EducationLevel = p.EducationLevel.ToString(),
             OptInMatching = p.OptInMatching,

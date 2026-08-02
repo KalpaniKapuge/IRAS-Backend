@@ -12,6 +12,8 @@ namespace IRAS.Application.Modules.Candidates.DTOs
         public string? Phone { get; set; }
         public string? Headline { get; set; }
         public string? ProfilePictureUrl { get; set; }
+        public string? GithubUrl { get; set; }
+        public string? LinkedInUrl { get; set; }
         public decimal TotalExpYears { get; set; }
         public string EducationLevel { get; set; } = null!;
         public bool OptInMatching { get; set; }
@@ -37,6 +39,12 @@ namespace IRAS.Application.Modules.Candidates.DTOs
 
         [StringLength(200)]
         public string? Headline { get; set; }
+
+        [Url, StringLength(300)]
+        public string? GithubUrl { get; set; }
+
+        [Url, StringLength(300)]
+        public string? LinkedInUrl { get; set; }
 
         [Required]
         public string EducationLevel { get; set; } = null!;

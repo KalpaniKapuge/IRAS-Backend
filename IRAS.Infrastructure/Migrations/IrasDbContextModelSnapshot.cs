@@ -299,11 +299,17 @@ namespace IRAS.Infrastructure.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<string>("GithubUrl")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<string>("Headline")
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("LastName")
                         .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("LinkedInUrl")
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<bool>("OptInMatching")
@@ -361,6 +367,78 @@ namespace IRAS.Infrastructure.Migrations
                     b.HasIndex("CandidateId");
 
                     b.ToTable("Certifications");
+                });
+
+            modelBuilder.Entity("IRAS.Domain.Entities.Candidate.CvDocument", b =>
+                {
+                    b.Property<int>("CvId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("CvId"));
+
+                    b.Property<int>("CandidateId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CustomizedReferenceTypes")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("SectionOrder")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Summary")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("TemplateName")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("CvId");
+
+                    b.HasIndex("CandidateId");
+
+                    b.ToTable("CvDocuments");
+                });
+
+            modelBuilder.Entity("IRAS.Domain.Entities.Candidate.CvSectionItem", b =>
+                {
+                    b.Property<int>("CvSectionItemId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("CvSectionItemId"));
+
+                    b.Property<int>("CvId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("OrderIndex")
+                        .HasColumnType("int");
+
+                    b.Property<int>("ReferenceId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("ReferenceType")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.HasKey("CvSectionItemId");
+
+                    b.HasIndex("CvId");
+
+                    b.ToTable("CvSectionItems");
                 });
 
             modelBuilder.Entity("IRAS.Domain.Entities.Candidate.Education", b =>
@@ -1053,6 +1131,28 @@ namespace IRAS.Infrastructure.Migrations
                     b.Navigation("Candidate");
                 });
 
+            modelBuilder.Entity("IRAS.Domain.Entities.Candidate.CvDocument", b =>
+                {
+                    b.HasOne("IRAS.Domain.Entities.Candidate.CandidateProfile", "Candidate")
+                        .WithMany()
+                        .HasForeignKey("CandidateId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Candidate");
+                });
+
+            modelBuilder.Entity("IRAS.Domain.Entities.Candidate.CvSectionItem", b =>
+                {
+                    b.HasOne("IRAS.Domain.Entities.Candidate.CvDocument", "Cv")
+                        .WithMany("Items")
+                        .HasForeignKey("CvId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Cv");
+                });
+
             modelBuilder.Entity("IRAS.Domain.Entities.Candidate.Education", b =>
                 {
                     b.HasOne("IRAS.Domain.Entities.Candidate.CandidateProfile", "Candidate")
@@ -1249,6 +1349,11 @@ namespace IRAS.Infrastructure.Migrations
                     b.Navigation("Resumes");
 
                     b.Navigation("WorkExperiences");
+                });
+
+            modelBuilder.Entity("IRAS.Domain.Entities.Candidate.CvDocument", b =>
+                {
+                    b.Navigation("Items");
                 });
 
             modelBuilder.Entity("IRAS.Domain.Entities.Employer.EmployerProfile", b =>

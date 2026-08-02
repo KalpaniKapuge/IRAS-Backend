@@ -26,6 +26,8 @@ namespace IRAS.Infrastructure.Data
         public DbSet<Skill> Skills => Set<Skill>();
         public DbSet<SkillAlias> SkillAliases => Set<SkillAlias>();
         public DbSet<CandidateSkill> CandidateSkills => Set<CandidateSkill>();
+        public DbSet<CvDocument> CvDocuments => Set<CvDocument>();
+        public DbSet<CvSectionItem> CvSectionItems => Set<CvSectionItem>();
         public DbSet<Job> Jobs => Set<Job>();
         public DbSet<JobRequiredSkill> JobRequiredSkills => Set<JobRequiredSkill>();
         public DbSet<Application> Applications => Set<Application>();
@@ -66,6 +68,7 @@ namespace IRAS.Infrastructure.Data
             b.Entity<ApplicationStatusHistory>().HasKey(h => h.HistoryId);
             b.Entity<KnowledgeBase>().HasKey(k => k.KbId);
             b.Entity<SkillAlias>().HasKey(a => a.AliasId);
+            b.Entity<CvDocument>().HasKey(c => c.CvId);
 
             // ---- Composite keys ----
             b.Entity<CandidateSkill>().HasKey(cs => new { cs.CandidateId, cs.SkillId });
