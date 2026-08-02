@@ -131,10 +131,30 @@ builder.Services.AddScoped<IJobMatchingService, JobMatchingService>();
 
 builder.Services.AddScoped<ISkillGapService, SkillGapService>();
 
-// Feedback (Module 9) — TemplateFeedbackGenerator is the dev-safe default (no LLM API key
-// needed), same swappable pattern as IJdGenerator. Registered before IApplicationService
-// since ApplicationService depends on IFeedbackService.
-builder.Services.AddScoped<IFeedbackGenerator, TemplateFeedbackGenerator>();
+// Skill gap explanation — real Google Gemini API call, same swappable pattern as
+// IJdGenerator. TemplateSkillGapExplainer remains as the deterministic baseline (thesis
+// evaluation chapter); GeminiSkillGapExplainer is what actually serves requests. Reuses the
+// GeminiOptions binding configured above. Registered before IApplicationService, which
+// depends on it directly (ApplyAsync calls it while building an application's skill gaps).
+builder.Services.AddHttpClient<ISkillGapExplainer, GeminiSkillGapExplainer>((sp, client) =>
+{
+    var opts = builder.Configuration.GetSection(GeminiOptions.SectionName).Get<GeminiOptions>()
+        ?? new GeminiOptions();
+    client.BaseAddress = new Uri(opts.BaseUrl);
+    client.Timeout = TimeSpan.FromSeconds(60);
+});
+
+// Feedback (Module 9) — real Google Gemini API call, same swappable pattern as
+// IJdGenerator. TemplateFeedbackGenerator remains as the deterministic baseline (thesis
+// evaluation chapter); GeminiFeedbackGenerator is what actually serves requests. Registered
+// before IApplicationService since ApplicationService depends on IFeedbackService.
+builder.Services.AddHttpClient<IFeedbackGenerator, GeminiFeedbackGenerator>((sp, client) =>
+{
+    var opts = builder.Configuration.GetSection(GeminiOptions.SectionName).Get<GeminiOptions>()
+        ?? new GeminiOptions();
+    client.BaseAddress = new Uri(opts.BaseUrl);
+    client.Timeout = TimeSpan.FromSeconds(60);
+});
 builder.Services.AddScoped<IFeedbackService, FeedbackService>();
 builder.Services.AddScoped<IApplicationService, ApplicationService>();
 

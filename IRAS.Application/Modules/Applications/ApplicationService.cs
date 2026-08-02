@@ -5,6 +5,7 @@ using Microsoft.Extensions.Logging;
 using IRAS.Application.Common.Scoring;
 using IRAS.Application.Modules.Applications.DTOs;
 using IRAS.Application.Modules.Feedback;
+using IRAS.Application.Modules.SkillGaps;
 using IRAS.Domain.Entities.Applications;
 using IRAS.Domain.Entities.Jobs;
 using IRAS.Domain.Enums;
@@ -50,14 +51,17 @@ namespace IRAS.Application.Modules.Applications
         private readonly IrasDbContext _db;
         private readonly IScoringService _scoring;
         private readonly IFeedbackService _feedback;
+        private readonly ISkillGapExplainer _skillGapExplainer;
         private readonly ILogger<ApplicationService> _logger;
 
         public ApplicationService(
-            IrasDbContext db, IScoringService scoring, IFeedbackService feedback, ILogger<ApplicationService> logger)
+            IrasDbContext db, IScoringService scoring, IFeedbackService feedback,
+            ISkillGapExplainer skillGapExplainer, ILogger<ApplicationService> logger)
         {
             _db = db;
             _scoring = scoring;
             _feedback = feedback;
+            _skillGapExplainer = skillGapExplainer;
             _logger = logger;
         }
 
@@ -112,20 +116,39 @@ namespace IRAS.Application.Modules.Applications
             _db.Applications.Add(application);
             await _db.SaveChangesAsync(ct);
 
-            var gaps = job.RequiredSkills
-                .Where(rs => !candidateSkillIds.Contains(rs.SkillId))
-                .Select(rs => new SkillGap
+            var missingSkills = job.RequiredSkills.Where(rs => !candidateSkillIds.Contains(rs.SkillId)).ToList();
+            if (missingSkills.Count > 0)
+            {
+                Dictionary<int, string> explanations;
+                try
+                {
+                    explanations = await _skillGapExplainer.ExplainAsync(
+                        job.Title,
+                        missingSkills.Select(rs => (rs.SkillId, rs.Skill.SkillName, rs.Importance.ToString())),
+                        ct);
+                }
+                catch (InvalidOperationException ex)
+                {
+                    // Skill gap explanation is a nice-to-have enrichment of the application
+                    // record, not a precondition for applying — an AI outage here must never
+                    // block a candidate from submitting. Same resilience posture as
+                    // ScoringService falling back to 0m on an AI service failure.
+                    _logger.LogWarning(ex, "Skill gap explanation unavailable for job {JobId}; using plain fallback text", job.JobId);
+                    explanations = missingSkills.ToDictionary(
+                        rs => rs.SkillId,
+                        rs => rs.Importance == ImportanceLevel.MustHave
+                            ? $"This role requires {rs.Skill.SkillName}. Consider highlighting related experience or upskilling before interviewing."
+                            : $"{rs.Skill.SkillName} is a nice-to-have for this role.");
+                }
+
+                var gaps = missingSkills.Select(rs => new SkillGap
                 {
                     ApplicationId = application.ApplicationId,
                     SkillId = rs.SkillId,
                     Importance = rs.Importance,
-                    Suggestion = rs.Importance == ImportanceLevel.MustHave
-                        ? $"This role requires {rs.Skill.SkillName}. Consider highlighting related experience or upskilling before interviewing."
-                        : $"{rs.Skill.SkillName} is a nice-to-have for this role."
-                })
-                .ToList();
-            if (gaps.Count > 0)
-            {
+                    Suggestion = explanations.GetValueOrDefault(rs.SkillId, $"{rs.Skill.SkillName} would strengthen this application.")
+                }).ToList();
+
                 _db.SkillGaps.AddRange(gaps);
                 await _db.SaveChangesAsync(ct);
             }
