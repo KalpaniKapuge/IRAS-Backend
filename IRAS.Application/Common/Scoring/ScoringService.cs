@@ -46,21 +46,24 @@ namespace IRAS.Application.Common.Scoring
             return Math.Round((decimal)((int)candidateLevel + 1) / ((int)requiredLevel + 1), 4);
         }
 
-        public decimal ComputeTotalScore(decimal skillMatch, decimal semanticSimilarity)
+        public decimal ComputeTotalScore(decimal skillMatch, decimal semanticSimilarity, decimal? mlFitScore = null)
         {
-            return Math.Round(_options.SkillMatchWeight * skillMatch + _options.SemanticSimilarityWeight * semanticSimilarity, 4);
+            var score = _options.SkillMatchWeight * skillMatch + _options.SemanticSimilarityWeight * semanticSimilarity;
+            if (mlFitScore.HasValue)
+                score += _options.MlFitScoreWeight * mlFitScore.Value;
+            return Math.Round(score, 4);
         }
 
-        public async Task<decimal> ComputeSemanticSimilarityAsync(int candidateId, string resumeText, Job job, CancellationToken ct)
+        public async Task<MatchSignals> ComputeMatchSignalAsync(int candidateId, string resumeText, Job job, CancellationToken ct)
         {
-            var results = await ComputeSemanticSimilaritiesAsync(job, new[] { (candidateId, resumeText) }, ct);
-            return results.TryGetValue(candidateId, out var score) ? score : 0m;
+            var results = await ComputeMatchSignalsAsync(job, new[] { (candidateId, resumeText) }, ct);
+            return results.TryGetValue(candidateId, out var signals) ? signals : new MatchSignals(0m, null);
         }
 
-        public async Task<Dictionary<int, decimal>> ComputeSemanticSimilaritiesAsync(
+        public async Task<Dictionary<int, MatchSignals>> ComputeMatchSignalsAsync(
             Job job, IReadOnlyList<(int CandidateId, string ResumeText)> candidates, CancellationToken ct)
         {
-            if (candidates.Count == 0) return new Dictionary<int, decimal>();
+            if (candidates.Count == 0) return new Dictionary<int, MatchSignals>();
 
             var jobText = job.GeneratedJd ?? job.RequirementInput ?? job.Title;
             var rankResult = await _ai.RankAsync(
@@ -70,16 +73,20 @@ namespace IRAS.Application.Common.Scoring
 
             if (!rankResult.Success)
             {
-                _logger.LogWarning("Semantic similarity unavailable for job {JobId}: {Error}", job.JobId, rankResult.Error);
-                return candidates.ToDictionary(c => c.CandidateId, _ => 0m);
+                _logger.LogWarning("Match signals unavailable for job {JobId}: {Error}", job.JobId, rankResult.Error);
+                return candidates.ToDictionary(c => c.CandidateId, _ => new MatchSignals(0m, null));
             }
 
-            var scores = rankResult.Results.ToDictionary(r => r.CandidateId, r => Math.Round(r.SemanticSimilarity, 4));
+            var signals = rankResult.Results.ToDictionary(
+                r => r.CandidateId,
+                r => new MatchSignals(
+                    Math.Round(r.SemanticSimilarity, 4),
+                    r.FitScore.HasValue ? Math.Round(r.FitScore.Value, 4) : null));
             // Guarantee every requested candidate has an entry even if the AI service
             // silently dropped one — callers index this dictionary without a TryGetValue.
             foreach (var c in candidates)
-                scores.TryAdd(c.CandidateId, 0m);
-            return scores;
+                signals.TryAdd(c.CandidateId, new MatchSignals(0m, null));
+            return signals;
         }
     }
 }

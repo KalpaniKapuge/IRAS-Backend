@@ -30,5 +30,15 @@ namespace IRAS.API.Controllers
             var deny = CheckAccess(candidateId); if (deny != null) return deny;
             return Ok(await _service.GetMyMatchesAsync(candidateId, ct));
         }
+
+        // On-demand recommendations, scored live against every currently published job —
+        // distinct from GetMine, which only returns persisted matches from when each job
+        // was originally published.
+        [HttpGet("recommended")]
+        public async Task<IActionResult> GetRecommended(int candidateId, CancellationToken ct)
+        {
+            var deny = CheckAccess(candidateId); if (deny != null) return deny;
+            return Ok(await _service.GetRecommendedJobsAsync(candidateId, ct));
+        }
     }
 }

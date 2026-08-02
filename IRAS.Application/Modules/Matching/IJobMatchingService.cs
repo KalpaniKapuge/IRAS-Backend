@@ -13,5 +13,12 @@ namespace IRAS.Application.Modules.Matching
         Task RunMatchingForJobAsync(int jobId, CancellationToken ct);
 
         Task<List<JobMatchDto>> GetMyMatchesAsync(int candidateId, CancellationToken ct);
+
+        // On-demand job recommendations: unlike GetMyMatchesAsync (which reads persisted,
+        // threshold-gated matches created when each job was published), this scores the
+        // candidate's current resume against every currently published job, live, right now
+        // — so it reflects profile/resume updates immediately and isn't limited to jobs that
+        // happened to trigger a passing match at publish time.
+        Task<List<JobRecommendationDto>> GetRecommendedJobsAsync(int candidateId, CancellationToken ct);
     }
 }

@@ -53,6 +53,7 @@ namespace IRAS.Application.Modules.Admin
         {
             SkillMatchWeight = _scoringOptions.SkillMatchWeight,
             SemanticSimilarityWeight = _scoringOptions.SemanticSimilarityWeight,
+            MlFitScoreWeight = _scoringOptions.MlFitScoreWeight,
             AutoMatchThreshold = _scoringOptions.AutoMatchThreshold,
             AiServiceBaseUrl = _aiOptions.BaseUrl,
             AiServiceTimeoutSeconds = _aiOptions.TimeoutSeconds,

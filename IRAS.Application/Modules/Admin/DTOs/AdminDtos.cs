@@ -60,6 +60,7 @@ namespace IRAS.Application.Modules.Admin.DTOs
     {
         public decimal SkillMatchWeight { get; set; }
         public decimal SemanticSimilarityWeight { get; set; }
+        public decimal MlFitScoreWeight { get; set; }
         public decimal AutoMatchThreshold { get; set; }
         public string AiServiceBaseUrl { get; set; } = null!;
         public int AiServiceTimeoutSeconds { get; set; }

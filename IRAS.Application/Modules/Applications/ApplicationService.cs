@@ -93,9 +93,9 @@ namespace IRAS.Application.Modules.Applications
             var skillMatch = _scoring.ComputeSkillMatch(job.RequiredSkills, candidateSkillIds);
             var experienceMatch = _scoring.ComputeExperienceMatch(candidate.TotalExpYears, job.MinExpYears);
             var educationMatch = _scoring.ComputeEducationMatch(candidate.EducationLevel, job.EducationReq);
-            var semanticSimilarity = await _scoring.ComputeSemanticSimilarityAsync(candidateId, resume.ParsedText!, job, ct);
+            var matchSignals = await _scoring.ComputeMatchSignalAsync(candidateId, resume.ParsedText!, job, ct);
 
-            var totalScore = _scoring.ComputeTotalScore(skillMatch, semanticSimilarity);
+            var totalScore = _scoring.ComputeTotalScore(skillMatch, matchSignals.SemanticSimilarity, matchSignals.MlFitScore);
 
             var application = new AppEntity
             {
@@ -107,7 +107,7 @@ namespace IRAS.Application.Modules.Applications
                 SkillMatch = skillMatch,
                 ExperienceMatch = experienceMatch,
                 EducationMatch = educationMatch,
-                SemanticSimilarity = semanticSimilarity
+                SemanticSimilarity = matchSignals.SemanticSimilarity
             };
             _db.Applications.Add(application);
             await _db.SaveChangesAsync(ct);

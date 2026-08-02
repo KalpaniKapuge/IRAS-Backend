@@ -68,14 +68,14 @@ namespace IRAS.Application.Modules.Matching
 
             // One batched HTTP call to the AI service for every eligible candidate's resume
             // against this single job — not N sequential calls.
-            var similarities = await _scoring.ComputeSemanticSimilaritiesAsync(job, eligible, ct);
+            var matchSignals = await _scoring.ComputeMatchSignalsAsync(job, eligible, ct);
 
             foreach (var (candidateId, _) in eligible)
             {
                 var skillIds = candidateSkillMap.GetValueOrDefault(candidateId, Array.Empty<int>());
                 var skillMatch = _scoring.ComputeSkillMatch(job.RequiredSkills, skillIds);
-                var semanticSimilarity = similarities.GetValueOrDefault(candidateId, 0m);
-                var matchScore = _scoring.ComputeTotalScore(skillMatch, semanticSimilarity);
+                var signals = matchSignals.GetValueOrDefault(candidateId, new MatchSignals(0m, null));
+                var matchScore = _scoring.ComputeTotalScore(skillMatch, signals.SemanticSimilarity, signals.MlFitScore);
                 var passed = matchScore >= _options.AutoMatchThreshold;
 
                 _db.JobMatches.Add(new JobMatch
@@ -115,6 +115,62 @@ namespace IRAS.Application.Modules.Matching
                     MatchedAt = m.MatchedAt
                 })
                 .ToListAsync(ct);
+        }
+
+        public async Task<List<JobRecommendationDto>> GetRecommendedJobsAsync(int candidateId, CancellationToken ct)
+        {
+            var candidate = await _db.CandidateProfiles
+                .Where(c => c.CandidateId == candidateId)
+                .Select(c => new
+                {
+                    ResumeText = c.Resumes
+                        .Where(r => r.IsPrimary && r.ParsedText != null)
+                        .Select(r => r.ParsedText)
+                        .FirstOrDefault()
+                })
+                .FirstOrDefaultAsync(ct);
+
+            // No parsed primary resume — same precondition RunMatchingForJobAsync applies,
+            // since skill-only recommendations without a free-text signal would be
+            // misleadingly ranked (every job would tie or rank purely on skill overlap).
+            if (candidate is null || string.IsNullOrWhiteSpace(candidate.ResumeText))
+                return new List<JobRecommendationDto>();
+
+            var candidateSkillIds = await _db.CandidateSkills
+                .Where(cs => cs.CandidateId == candidateId)
+                .Select(cs => cs.SkillId)
+                .ToListAsync(ct);
+
+            var jobs = await _db.Jobs
+                .Where(j => j.Status == JobStatus.Published)
+                .Include(j => j.RequiredSkills)
+                .Include(j => j.Employer)
+                .ToListAsync(ct);
+
+            var recommendations = new List<JobRecommendationDto>();
+            foreach (var job in jobs)
+            {
+                var skillMatch = _scoring.ComputeSkillMatch(job.RequiredSkills, candidateSkillIds);
+                // One AI-service call per published job — acceptable at prototype scale
+                // (the Python /api/v1/rank contract is job-centric: one job description
+                // against many candidates). A high-volume production deployment would need
+                // a candidate-centric batch endpoint to avoid N sequential HTTP calls here.
+                var signals = await _scoring.ComputeMatchSignalAsync(candidateId, candidate.ResumeText!, job, ct);
+                var matchScore = _scoring.ComputeTotalScore(skillMatch, signals.SemanticSimilarity, signals.MlFitScore);
+
+                recommendations.Add(new JobRecommendationDto
+                {
+                    JobId = job.JobId,
+                    JobTitle = job.Title,
+                    CompanyName = job.Employer.CompanyName,
+                    MatchScore = matchScore,
+                    SkillMatch = skillMatch,
+                    SemanticSimilarity = signals.SemanticSimilarity,
+                    MlFitScore = signals.MlFitScore
+                });
+            }
+
+            return recommendations.OrderByDescending(r => r.MatchScore).Take(20).ToList();
         }
     }
 }
