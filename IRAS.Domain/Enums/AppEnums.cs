@@ -12,6 +12,9 @@ namespace IRAS.Domain.Enums
     public enum SkillCategory { ProgrammingLanguage, Framework, Database, CloudPlatform, Tool, SoftSkill, Other }
     public enum AliasSource { SystemSeeded, AdminAdded, LearnedFromParsing }
 
+    public enum SkillResourceType { Course, Tutorial, Project, Documentation }
+    public enum TargetSkillStatus { Learning, Completed }
+
     public enum ImportanceLevel { MustHave, NiceToHave }
     public enum EmploymentType { FullTime, PartTime, Contract, Internship, Remote }
     public enum JobStatus { Draft, Published, Closed, Archived }

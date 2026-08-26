@@ -1,20 +1,25 @@
 // IRAS.Application/Common/Scoring/ScoringService.cs
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using IRAS.Application.Common.Ai;
 using IRAS.Domain.Entities.Jobs;
 using IRAS.Domain.Enums;
+using IRAS.Infrastructure.Data;
 
 namespace IRAS.Application.Common.Scoring
 {
     public class ScoringService : IScoringService
     {
+        private readonly IrasDbContext _db;
         private readonly IAiServiceClient _ai;
         private readonly ScoringOptions _options;
         private readonly ILogger<ScoringService> _logger;
 
-        public ScoringService(IAiServiceClient ai, IOptions<ScoringOptions> options, ILogger<ScoringService> logger)
+        public ScoringService(
+            IrasDbContext db, IAiServiceClient ai, IOptions<ScoringOptions> options, ILogger<ScoringService> logger)
         {
+            _db = db;
             _ai = ai;
             _options = options.Value;
             _logger = logger;
@@ -65,10 +70,19 @@ namespace IRAS.Application.Common.Scoring
         {
             if (candidates.Count == 0) return new Dictionary<int, MatchSignals>();
 
+            // Same taxonomy shape/source ResumeService.ParseAndPersistAsync already sends to
+            // /parse-resume — the fit classifier needs it to compute skill-overlap features.
+            var taxonomy = await _db.Skills
+                .Include(s => s.Aliases)
+                .Select(s => new TaxonomyItem(
+                    s.SkillId, s.SkillName, s.Aliases.Select(a => a.AliasText).ToList()))
+                .ToListAsync(ct);
+
             var jobText = job.GeneratedJd ?? job.RequirementInput ?? job.Title;
             var rankResult = await _ai.RankAsync(
                 jobText,
                 candidates.Select(c => new RankCandidateInput(c.CandidateId, c.ResumeText)).ToList(),
+                taxonomy,
                 ct);
 
             if (!rankResult.Success)

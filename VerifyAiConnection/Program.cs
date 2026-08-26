@@ -19,11 +19,25 @@ var candidates = new List<RankCandidateInput>
     new(3, "Full-stack software engineer skilled in React, Node.js, and PostgreSQL, 4 years of experience.")
 };
 
+// Small hand-picked taxonomy (not loaded from the DB — this is a standalone script)
+// covering the skills mentioned above, so the fit classifier's skill-overlap features
+// are exercised meaningfully rather than computed against an empty taxonomy.
+var taxonomy = new List<TaxonomyItem>
+{
+    new(1, "Python", new List<string> { "Python3" }),
+    new(2, "AWS", new List<string> { "Amazon Web Services" }),
+    new(3, "Docker", new List<string>()),
+    new(4, "React", new List<string> { "React.js", "ReactJS" }),
+    new(5, "Node.js", new List<string> { "NodeJS", "Node" }),
+    new(6, "PostgreSQL", new List<string> { "Postgres" }),
+};
+
 Console.WriteLine("Calling AiServiceClient.RankAsync against the live ai-service...\n");
 
 var result = await client.RankAsync(
     "Looking for a software engineer with Python and AWS experience.",
     candidates,
+    taxonomy,
     CancellationToken.None);
 
 Console.WriteLine($"Success: {result.Success}");
@@ -50,8 +64,10 @@ var optionsNew = Microsoft.Extensions.Options.Options.Create(new ScoringOptions
 });
 
 var loggerScoring = loggerFactory.CreateLogger<ScoringService>();
-var scoringOld = new ScoringService(client, optionsOld, loggerScoring);
-var scoringNew = new ScoringService(client, optionsNew, loggerScoring);
+// null! for IrasDbContext: ComputeTotalScore below is a pure function that never touches
+// _db (only ComputeMatchSignalsAsync does, which this demo doesn't call).
+var scoringOld = new ScoringService(null!, client, optionsOld, loggerScoring);
+var scoringNew = new ScoringService(null!, client, optionsNew, loggerScoring);
 
 decimal skillMatch = 0.8m, semanticSimilarity = 0.767m, mlFitScore = 0.201m;
 

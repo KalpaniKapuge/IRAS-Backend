@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("VerifyAiConnection")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+16daccbbaf750785d1df9b96506e6650c6629dce")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+d09d62e7a9841f560dccf830f405667fd5882aee")]
 [assembly: System.Reflection.AssemblyProductAttribute("VerifyAiConnection")]
 [assembly: System.Reflection.AssemblyTitleAttribute("VerifyAiConnection")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

@@ -26,6 +26,8 @@ namespace IRAS.Infrastructure.Data
         public DbSet<Skill> Skills => Set<Skill>();
         public DbSet<SkillAlias> SkillAliases => Set<SkillAlias>();
         public DbSet<CandidateSkill> CandidateSkills => Set<CandidateSkill>();
+        public DbSet<SkillResource> SkillResources => Set<SkillResource>();
+        public DbSet<CandidateTargetSkill> CandidateTargetSkills => Set<CandidateTargetSkill>();
         public DbSet<CvDocument> CvDocuments => Set<CvDocument>();
         public DbSet<CvSectionItem> CvSectionItems => Set<CvSectionItem>();
         public DbSet<Job> Jobs => Set<Job>();
@@ -73,6 +75,10 @@ namespace IRAS.Infrastructure.Data
             // ---- Composite keys ----
             b.Entity<CandidateSkill>().HasKey(cs => new { cs.CandidateId, cs.SkillId });
             b.Entity<JobRequiredSkill>().HasKey(jrs => new { jrs.JobId, jrs.SkillId });
+            b.Entity<CandidateTargetSkill>().HasKey(t => new { t.CandidateId, t.SkillId });
+
+            // ---- Non-conventional primary key names (SkillResource) ----
+            b.Entity<SkillResource>().HasKey(r => r.ResourceId);
 
             // ---- Unique constraints (correction #2) ----
             b.Entity<Application>().HasIndex(a => new { a.CandidateId, a.JobId }).IsUnique();
@@ -93,6 +99,10 @@ namespace IRAS.Infrastructure.Data
                 .HasForeignKey(jrs => jrs.SkillId).OnDelete(DeleteBehavior.Restrict);
             b.Entity<SkillGap>().HasOne(g => g.Skill).WithMany()
                 .HasForeignKey(g => g.SkillId).OnDelete(DeleteBehavior.Restrict);
+            b.Entity<SkillResource>().HasOne(r => r.Skill).WithMany()
+                .HasForeignKey(r => r.SkillId).OnDelete(DeleteBehavior.Restrict);
+            b.Entity<CandidateTargetSkill>().HasOne(t => t.Skill).WithMany()
+                .HasForeignKey(t => t.SkillId).OnDelete(DeleteBehavior.Restrict);
 
             // ---- Skill taxonomy uniqueness ----
             b.Entity<Skill>().HasIndex(s => s.SkillName).IsUnique();
@@ -111,6 +121,8 @@ namespace IRAS.Infrastructure.Data
                 .HasForeignKey(f => f.ApprovedBy).OnDelete(DeleteBehavior.Restrict);
             b.Entity<KnowledgeBase>().HasOne(k => k.UpdatedByUser).WithMany()
                 .HasForeignKey(k => k.UpdatedBy).OnDelete(DeleteBehavior.Restrict);
+            b.Entity<SkillResource>().HasOne(r => r.CreatedByUser).WithMany()
+                .HasForeignKey(r => r.CreatedBy).OnDelete(DeleteBehavior.Restrict);
             b.Entity<Interview>().HasOne(i => i.ScheduledByUser).WithMany()
                 .HasForeignKey(i => i.ScheduledBy).OnDelete(DeleteBehavior.Restrict);
 

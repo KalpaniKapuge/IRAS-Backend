@@ -25,6 +25,7 @@ using IRAS.Application.Modules.Jobs;
 using IRAS.Application.Modules.KnowledgeBase;
 using IRAS.Application.Modules.Matching;
 using IRAS.Application.Modules.Resumes;
+using IRAS.Application.Modules.SkillDevelopment;
 using IRAS.Application.Modules.SkillGaps;
 using IRAS.Application.Modules.SkillTaxonomy;
 using IRAS.Infrastructure.Data;
@@ -50,6 +51,11 @@ builder.Services.AddSwaggerGen(options =>
     // Only mark endpoints that actually require auth (has [Authorize], no [AllowAnonymous])
     // with the padlock — public endpoints like /register and /login stay open in the docs.
     options.OperationFilter<AuthorizeCheckOperationFilter>();
+
+    // CandidateProfileController has JSON- and multipart-form actions sharing one route,
+    // disambiguated at runtime by [Consumes] — Swashbuckle doesn't do that, so pick one
+    // action's description per conflicting method/path pair for doc generation only.
+    options.ResolveConflictingActions(apiDescriptions => apiDescriptions.First());
 });
 
 builder.Services.AddDbContext<IrasDbContext>(options =>
@@ -128,6 +134,7 @@ builder.Services.AddScoped<INotificationService, NotificationService>();
 builder.Services.AddScoped<IJobMatchingService, JobMatchingService>();
 
 builder.Services.AddScoped<ISkillGapService, SkillGapService>();
+builder.Services.AddScoped<ISkillDevelopmentService, SkillDevelopmentService>();
 
 builder.Services.AddHttpClient<ISkillGapExplainer, GeminiSkillGapExplainer>((sp, client) =>
 {

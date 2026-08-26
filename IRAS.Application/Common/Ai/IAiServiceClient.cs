@@ -27,7 +27,8 @@ namespace IRAS.Application.Common.Ai
             IReadOnlyList<TaxonomyItem> taxonomy, CancellationToken ct);
 
         Task<RankResult> RankAsync(
-            string jobDescription, IReadOnlyList<RankCandidateInput> candidates, CancellationToken ct);
+            string jobDescription, IReadOnlyList<RankCandidateInput> candidates,
+            IReadOnlyList<TaxonomyItem> taxonomy, CancellationToken ct);
 
         // Liveness check against the Python service's /health — backs Admin's "AI Model
         // Monitoring" screen. Returns false on any failure (timeout, connection refused,

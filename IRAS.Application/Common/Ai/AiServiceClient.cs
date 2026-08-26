@@ -55,12 +55,14 @@ namespace IRAS.Application.Common.Ai
         }
 
         public async Task<RankResult> RankAsync(
-            string jobDescription, IReadOnlyList<RankCandidateInput> candidates, CancellationToken ct)
+            string jobDescription, IReadOnlyList<RankCandidateInput> candidates,
+            IReadOnlyList<TaxonomyItem> taxonomy, CancellationToken ct)
         {
             var body = new
             {
                 JobDescription = jobDescription,
-                Candidates = candidates.Select(c => new { c.CandidateId, c.ResumeText })
+                Candidates = candidates.Select(c => new { c.CandidateId, c.ResumeText }),
+                Taxonomy = taxonomy.Select(t => new { t.SkillId, t.SkillName, t.Aliases })
             };
 
             try
