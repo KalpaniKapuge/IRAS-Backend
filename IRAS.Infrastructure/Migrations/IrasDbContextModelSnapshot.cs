@@ -54,7 +54,7 @@ namespace IRAS.Infrastructure.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("AuditLogs");
+                    b.ToTable("AuditLogs", "admin");
                 });
 
             modelBuilder.Entity("IRAS.Domain.Entities.Admin.KnowledgeBase", b =>
@@ -91,7 +91,7 @@ namespace IRAS.Infrastructure.Migrations
 
                     b.HasIndex("UpdatedBy");
 
-                    b.ToTable("KnowledgeBases");
+                    b.ToTable("KnowledgeBases", "admin");
                 });
 
             modelBuilder.Entity("IRAS.Domain.Entities.Applications.Application", b =>
@@ -146,7 +146,7 @@ namespace IRAS.Infrastructure.Migrations
                     b.HasIndex("CandidateId", "JobId")
                         .IsUnique();
 
-                    b.ToTable("Applications");
+                    b.ToTable("Applications", "applications");
                 });
 
             modelBuilder.Entity("IRAS.Domain.Entities.Applications.ApplicationStatusHistory", b =>
@@ -182,7 +182,7 @@ namespace IRAS.Infrastructure.Migrations
 
                     b.HasIndex("ChangedBy");
 
-                    b.ToTable("ApplicationStatusHistories");
+                    b.ToTable("ApplicationStatusHistories", "applications");
                 });
 
             modelBuilder.Entity("IRAS.Domain.Entities.Applications.Interview", b =>
@@ -242,7 +242,7 @@ namespace IRAS.Infrastructure.Migrations
 
                     b.HasIndex("ScheduledBy");
 
-                    b.ToTable("Interviews");
+                    b.ToTable("Interviews", "applications");
                 });
 
             modelBuilder.Entity("IRAS.Domain.Entities.Applications.SkillGap", b =>
@@ -276,7 +276,7 @@ namespace IRAS.Infrastructure.Migrations
 
                     b.HasIndex("SkillId");
 
-                    b.ToTable("SkillGaps");
+                    b.ToTable("SkillGaps", "applications");
                 });
 
             modelBuilder.Entity("IRAS.Domain.Entities.Candidate.CandidateProfile", b =>
@@ -326,7 +326,7 @@ namespace IRAS.Infrastructure.Migrations
 
                     b.HasKey("CandidateId");
 
-                    b.ToTable("CandidateProfiles");
+                    b.ToTable("CandidateProfiles", "candidate");
                 });
 
             modelBuilder.Entity("IRAS.Domain.Entities.Candidate.Certification", b =>
@@ -366,7 +366,7 @@ namespace IRAS.Infrastructure.Migrations
 
                     b.HasIndex("CandidateId");
 
-                    b.ToTable("Certifications");
+                    b.ToTable("Certifications", "candidate");
                 });
 
             modelBuilder.Entity("IRAS.Domain.Entities.Candidate.CvDocument", b =>
@@ -409,7 +409,7 @@ namespace IRAS.Infrastructure.Migrations
 
                     b.HasIndex("CandidateId");
 
-                    b.ToTable("CvDocuments");
+                    b.ToTable("CvDocuments", "candidate");
                 });
 
             modelBuilder.Entity("IRAS.Domain.Entities.Candidate.CvSectionItem", b =>
@@ -438,7 +438,7 @@ namespace IRAS.Infrastructure.Migrations
 
                     b.HasIndex("CvId");
 
-                    b.ToTable("CvSectionItems");
+                    b.ToTable("CvSectionItems", "candidate");
                 });
 
             modelBuilder.Entity("IRAS.Domain.Entities.Candidate.Education", b =>
@@ -476,7 +476,7 @@ namespace IRAS.Infrastructure.Migrations
 
                     b.HasIndex("CandidateId");
 
-                    b.ToTable("Educations");
+                    b.ToTable("Educations", "candidate");
                 });
 
             modelBuilder.Entity("IRAS.Domain.Entities.Candidate.Resume", b =>
@@ -520,7 +520,7 @@ namespace IRAS.Infrastructure.Migrations
 
                     b.HasIndex("CandidateId");
 
-                    b.ToTable("Resumes");
+                    b.ToTable("Resumes", "candidate");
                 });
 
             modelBuilder.Entity("IRAS.Domain.Entities.Candidate.WorkExperience", b =>
@@ -558,7 +558,7 @@ namespace IRAS.Infrastructure.Migrations
 
                     b.HasIndex("CandidateId");
 
-                    b.ToTable("WorkExperiences");
+                    b.ToTable("WorkExperiences", "candidate");
                 });
 
             modelBuilder.Entity("IRAS.Domain.Entities.Employer.EmployerProfile", b =>
@@ -592,7 +592,7 @@ namespace IRAS.Infrastructure.Migrations
 
                     b.HasKey("EmployerId");
 
-                    b.ToTable("EmployerProfiles");
+                    b.ToTable("EmployerProfiles", "employer");
                 });
 
             modelBuilder.Entity("IRAS.Domain.Entities.Engagement.ChatConversation", b =>
@@ -619,7 +619,7 @@ namespace IRAS.Infrastructure.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("ChatConversations");
+                    b.ToTable("ChatConversations", "engagement");
                 });
 
             modelBuilder.Entity("IRAS.Domain.Entities.Engagement.ChatMessage", b =>
@@ -652,7 +652,7 @@ namespace IRAS.Infrastructure.Migrations
 
                     b.HasIndex("ConversationId");
 
-                    b.ToTable("ChatMessages");
+                    b.ToTable("ChatMessages", "engagement");
                 });
 
             modelBuilder.Entity("IRAS.Domain.Entities.Engagement.Notification", b =>
@@ -700,7 +700,7 @@ namespace IRAS.Infrastructure.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("Notifications");
+                    b.ToTable("Notifications", "engagement");
                 });
 
             modelBuilder.Entity("IRAS.Domain.Entities.Feedback.Feedback", b =>
@@ -749,7 +749,7 @@ namespace IRAS.Infrastructure.Migrations
 
                     b.HasIndex("ApprovedBy");
 
-                    b.ToTable("Feedbacks");
+                    b.ToTable("Feedbacks", "feedback");
                 });
 
             modelBuilder.Entity("IRAS.Domain.Entities.Identity.User", b =>
@@ -787,7 +787,7 @@ namespace IRAS.Infrastructure.Migrations
                     b.HasIndex("Email")
                         .IsUnique();
 
-                    b.ToTable("Users");
+                    b.ToTable("Users", "identity");
                 });
 
             modelBuilder.Entity("IRAS.Domain.Entities.Jobs.Job", b =>
@@ -849,7 +849,7 @@ namespace IRAS.Infrastructure.Migrations
 
                     b.HasIndex("EmployerId");
 
-                    b.ToTable("Jobs");
+                    b.ToTable("Jobs", "jobs");
                 });
 
             modelBuilder.Entity("IRAS.Domain.Entities.Jobs.JobMatch", b =>
@@ -885,7 +885,7 @@ namespace IRAS.Infrastructure.Migrations
                     b.HasIndex("JobId", "CandidateId")
                         .IsUnique();
 
-                    b.ToTable("JobMatches");
+                    b.ToTable("JobMatches", "jobs");
                 });
 
             modelBuilder.Entity("IRAS.Domain.Entities.Jobs.JobRequiredSkill", b =>
@@ -911,7 +911,7 @@ namespace IRAS.Infrastructure.Migrations
 
                     b.HasIndex("SkillId");
 
-                    b.ToTable("JobRequiredSkills");
+                    b.ToTable("JobRequiredSkills", "jobs");
                 });
 
             modelBuilder.Entity("IRAS.Domain.Entities.Skills.CandidateSkill", b =>
@@ -942,7 +942,7 @@ namespace IRAS.Infrastructure.Migrations
 
                     b.HasIndex("SkillId");
 
-                    b.ToTable("CandidateSkills");
+                    b.ToTable("CandidateSkills", "skills");
                 });
 
             modelBuilder.Entity("IRAS.Domain.Entities.Skills.CandidateTargetSkill", b =>
@@ -968,7 +968,7 @@ namespace IRAS.Infrastructure.Migrations
 
                     b.HasIndex("SkillId");
 
-                    b.ToTable("CandidateTargetSkills");
+                    b.ToTable("CandidateTargetSkills", "skills");
                 });
 
             modelBuilder.Entity("IRAS.Domain.Entities.Skills.Skill", b =>
@@ -996,7 +996,7 @@ namespace IRAS.Infrastructure.Migrations
                     b.HasIndex("SkillName")
                         .IsUnique();
 
-                    b.ToTable("Skills");
+                    b.ToTable("Skills", "skills");
                 });
 
             modelBuilder.Entity("IRAS.Domain.Entities.Skills.SkillAlias", b =>
@@ -1026,7 +1026,7 @@ namespace IRAS.Infrastructure.Migrations
 
                     b.HasIndex("SkillId");
 
-                    b.ToTable("SkillAliases");
+                    b.ToTable("SkillAliases", "skills");
                 });
 
             modelBuilder.Entity("IRAS.Domain.Entities.Skills.SkillResource", b =>
@@ -1071,7 +1071,7 @@ namespace IRAS.Infrastructure.Migrations
 
                     b.HasIndex("SkillId");
 
-                    b.ToTable("SkillResources");
+                    b.ToTable("SkillResources", "skills");
                 });
 
             modelBuilder.Entity("IRAS.Domain.Entities.Admin.AuditLog", b =>

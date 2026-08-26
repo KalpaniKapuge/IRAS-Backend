@@ -46,85 +46,10 @@ namespace IRAS.Infrastructure.Data
 
         protected override void OnModelCreating(ModelBuilder b)
         {
-            // ---- Identity: one-to-one specialization (User -> Candidate/Employer) ----
-            b.Entity<CandidateProfile>().HasKey(c => c.CandidateId);
-            b.Entity<CandidateProfile>()
-                .HasOne(c => c.User).WithOne(u => u.CandidateProfile)
-                .HasForeignKey<CandidateProfile>(c => c.CandidateId);
-            
-            b.Entity<EmployerProfile>().HasKey(e => e.EmployerId);
-
-            b.Entity<EmployerProfile>()
-                .HasOne(e => e.User).WithOne(u => u.EmployerProfile)
-                .HasForeignKey<EmployerProfile>(e => e.EmployerId);
-
-            b.Entity<User>().HasIndex(u => u.Email).IsUnique();          // correction #2
-
-            // ---- Non-conventional primary key names ----
-            b.Entity<AuditLog>().HasKey(a => a.LogId);
-            b.Entity<ChatMessage>().HasKey(m => m.MessageId);
-            b.Entity<WorkExperience>().HasKey(w => w.ExperienceId);
-            b.Entity<ChatConversation>().HasKey(c => c.ConversationId);
-            b.Entity<JobMatch>().HasKey(m => m.MatchId);
-            b.Entity<SkillGap>().HasKey(g => g.GapId);
-            b.Entity<ApplicationStatusHistory>().HasKey(h => h.HistoryId);
-            b.Entity<KnowledgeBase>().HasKey(k => k.KbId);
-            b.Entity<SkillAlias>().HasKey(a => a.AliasId);
-            b.Entity<CvDocument>().HasKey(c => c.CvId);
-
-            // ---- Composite keys ----
-            b.Entity<CandidateSkill>().HasKey(cs => new { cs.CandidateId, cs.SkillId });
-            b.Entity<JobRequiredSkill>().HasKey(jrs => new { jrs.JobId, jrs.SkillId });
-            b.Entity<CandidateTargetSkill>().HasKey(t => new { t.CandidateId, t.SkillId });
-
-            // ---- Non-conventional primary key names (SkillResource) ----
-            b.Entity<SkillResource>().HasKey(r => r.ResourceId);
-
-            // ---- Unique constraints (correction #2) ----
-            b.Entity<Application>().HasIndex(a => new { a.CandidateId, a.JobId }).IsUnique();
-            b.Entity<JobMatch>().HasIndex(m => new { m.JobId, m.CandidateId }).IsUnique();
-
-            // ---- Decimal precision (correction #7) ----
-            foreach (var prop in new[] { "TotalScore", "SkillMatch", "ExperienceMatch", "EducationMatch", "SemanticSimilarity" })
-                b.Entity<Application>().Property(prop).HasColumnType("decimal(5,4)");
-            b.Entity<JobMatch>().Property(m => m.MatchScore).HasColumnType("decimal(5,4)");
-            b.Entity<JobRequiredSkill>().Property(j => j.Weight).HasColumnType("decimal(5,4)");
-            b.Entity<CandidateProfile>().Property(c => c.TotalExpYears).HasColumnType("decimal(4,1)");
-            b.Entity<CandidateSkill>().Property(c => c.YearsExp).HasColumnType("decimal(4,1)");
-
-            // ---- Skill deletion safety: block deletes when the skill is referenced ----
-            b.Entity<CandidateSkill>().HasOne(cs => cs.Skill).WithMany()
-                .HasForeignKey(cs => cs.SkillId).OnDelete(DeleteBehavior.Restrict);
-            b.Entity<JobRequiredSkill>().HasOne(jrs => jrs.Skill).WithMany()
-                .HasForeignKey(jrs => jrs.SkillId).OnDelete(DeleteBehavior.Restrict);
-            b.Entity<SkillGap>().HasOne(g => g.Skill).WithMany()
-                .HasForeignKey(g => g.SkillId).OnDelete(DeleteBehavior.Restrict);
-            b.Entity<SkillResource>().HasOne(r => r.Skill).WithMany()
-                .HasForeignKey(r => r.SkillId).OnDelete(DeleteBehavior.Restrict);
-            b.Entity<CandidateTargetSkill>().HasOne(t => t.Skill).WithMany()
-                .HasForeignKey(t => t.SkillId).OnDelete(DeleteBehavior.Restrict);
-
-            // ---- Skill taxonomy uniqueness ----
-            b.Entity<Skill>().HasIndex(s => s.SkillName).IsUnique();
-            b.Entity<SkillAlias>().HasIndex(a => a.AliasText).IsUnique();
-
-            // ---- Restrict cascade paths that SQL Server would reject as multiple cascade paths ----
-            b.Entity<Application>().HasOne(a => a.Resume).WithMany()
-                .HasForeignKey(a => a.ResumeId).OnDelete(DeleteBehavior.Restrict);
-            b.Entity<Application>().HasOne(a => a.Job).WithMany()
-                .HasForeignKey(a => a.JobId).OnDelete(DeleteBehavior.Restrict);
-            b.Entity<JobMatch>().HasOne(m => m.Job).WithMany()
-                .HasForeignKey(m => m.JobId).OnDelete(DeleteBehavior.Restrict);
-            b.Entity<ApplicationStatusHistory>().HasOne(h => h.ChangedByUser).WithMany()
-                .HasForeignKey(h => h.ChangedBy).OnDelete(DeleteBehavior.Restrict);
-            b.Entity<Feedback>().HasOne(f => f.ApprovedByUser).WithMany()
-                .HasForeignKey(f => f.ApprovedBy).OnDelete(DeleteBehavior.Restrict);
-            b.Entity<KnowledgeBase>().HasOne(k => k.UpdatedByUser).WithMany()
-                .HasForeignKey(k => k.UpdatedBy).OnDelete(DeleteBehavior.Restrict);
-            b.Entity<SkillResource>().HasOne(r => r.CreatedByUser).WithMany()
-                .HasForeignKey(r => r.CreatedBy).OnDelete(DeleteBehavior.Restrict);
-            b.Entity<Interview>().HasOne(i => i.ScheduledByUser).WithMany()
-                .HasForeignKey(i => i.ScheduledBy).OnDelete(DeleteBehavior.Restrict);
+            // Table names, schemas, keys, indexes, and FK behavior per entity now live
+            // in IRAS.Infrastructure/Persistence/Configuration/<Module>/*Configuration.cs,
+            // one class per table, grouped and scoped into a SQL Server schema per module.
+            b.ApplyConfigurationsFromAssembly(typeof(IrasDbContext).Assembly);
 
             // ---- Store enums as strings, not ints (readability in SQL Server) ----
             foreach (var entityType in b.Model.GetEntityTypes())
