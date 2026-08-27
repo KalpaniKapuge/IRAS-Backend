@@ -1,4 +1,5 @@
 // IRAS.Application/Modules/Jobs/IJobService.cs
+using Microsoft.AspNetCore.Http;
 using IRAS.Application.Modules.Jobs.DTOs;
 
 namespace IRAS.Application.Modules.Jobs
@@ -7,6 +8,7 @@ namespace IRAS.Application.Modules.Jobs
     {
         Task<EmployerProfileDto> GetEmployerProfileAsync(int employerId);
         Task UpdateEmployerProfileAsync(int employerId, UpdateEmployerProfileRequest request);
+        Task<EmployerProfileDto> UploadEmployerLogoAsync(int employerId, IFormFile file, CancellationToken ct);
 
         Task<JobDto> CreateJobAsync(int employerId, CreateJobRequest request);
         Task<JobDto> UpdateJobAsync(int employerId, int jobId, UpdateJobRequest request);

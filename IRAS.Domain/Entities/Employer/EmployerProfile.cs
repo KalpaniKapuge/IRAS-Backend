@@ -14,6 +14,7 @@ namespace IRAS.Domain.Entities.Employer
         public string? Website { get; set; }
         public string? Location { get; set; }
         public string? Description { get; set; }
+        public string? LogoUrl { get; set; }
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
         public User User { get; set; } = null!;

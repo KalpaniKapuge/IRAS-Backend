@@ -45,6 +45,22 @@ namespace IRAS.API.Controllers
             return NoContent();
         }
 
+        [HttpPost("logo")]
+        [Consumes("multipart/form-data")]
+        public async Task<IActionResult> UploadLogo(int employerId, CancellationToken ct)
+        {
+            var deny = CheckAccess(employerId); if (deny != null) return deny;
+
+            var file = Request.Form.Files.GetFile("file")
+                ?? Request.Form.Files.GetFile("logo")
+                ?? Request.Form.Files.FirstOrDefault();
+
+            if (file is null)
+                return BadRequest(new { message = "Company logo file is required." });
+
+            return Ok(await _service.UploadEmployerLogoAsync(employerId, file, ct));
+        }
+
         // All interviews across every job this employer owns, soonest first — a
         // dashboard-style view distinct from the per-application list in
         // EmployerApplicationsController.

@@ -1,8 +1,11 @@
 // IRAS.Application/Modules/Jobs/JobService.cs
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using IRAS.Application.Common.Storage;
 using IRAS.Application.Modules.Jobs.DTOs;
 using IRAS.Application.Modules.Matching;
+using IRAS.Domain.Entities.Employer;
 using IRAS.Domain.Entities.Jobs;
 using IRAS.Domain.Enums;
 using IRAS.Infrastructure.Data;
@@ -11,17 +14,32 @@ namespace IRAS.Application.Modules.Jobs
 {
     public class JobService : IJobService
     {
+        private const long MaxLogoBytes = 2 * 1024 * 1024;
+
+        private static readonly HashSet<string> LogoExtensions = new(StringComparer.OrdinalIgnoreCase)
+        {
+            ".jpg", ".jpeg", ".png", ".webp"
+        };
+
+        private static readonly HashSet<string> LogoContentTypes = new(StringComparer.OrdinalIgnoreCase)
+        {
+            "image/jpeg", "image/png", "image/webp"
+        };
+
         private readonly IrasDbContext _db;
         private readonly IJdGenerator _jdGenerator;
         private readonly IJobMatchingService _matchingService;
+        private readonly IFileStorage _storage;
         private readonly ILogger<JobService> _logger;
 
         public JobService(
-            IrasDbContext db, IJdGenerator jdGenerator, IJobMatchingService matchingService, ILogger<JobService> logger)
+            IrasDbContext db, IJdGenerator jdGenerator, IJobMatchingService matchingService,
+            IFileStorage storage, ILogger<JobService> logger)
         {
             _db = db;
             _jdGenerator = jdGenerator;
             _matchingService = matchingService;
+            _storage = storage;
             _logger = logger;
         }
 
@@ -32,12 +50,7 @@ namespace IRAS.Application.Modules.Jobs
             var p = await _db.EmployerProfiles.FirstOrDefaultAsync(e => e.EmployerId == employerId)
                 ?? throw new KeyNotFoundException("Employer profile not found.");
 
-            return new EmployerProfileDto
-            {
-                EmployerId = p.EmployerId, CompanyName = p.CompanyName, Industry = p.Industry,
-                CompanySize = p.CompanySize.ToString(), Website = p.Website,
-                Location = p.Location, Description = p.Description
-            };
+            return MapToProfileDto(p);
         }
 
         public async Task UpdateEmployerProfileAsync(int employerId, UpdateEmployerProfileRequest request)
@@ -55,6 +68,52 @@ namespace IRAS.Application.Modules.Jobs
             p.Description = request.Description;
             await _db.SaveChangesAsync();
         }
+
+        public async Task<EmployerProfileDto> UploadEmployerLogoAsync(int employerId, IFormFile file, CancellationToken ct)
+        {
+            var p = await _db.EmployerProfiles.FirstOrDefaultAsync(e => e.EmployerId == employerId, ct)
+                ?? throw new KeyNotFoundException("Employer profile not found.");
+
+            ValidateLogoUpload(file);
+
+            var oldLogoUrl = p.LogoUrl;
+            var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
+            var storedName = $"{Guid.NewGuid():N}{extension}";
+
+            await using (var stream = file.OpenReadStream())
+            {
+                p.LogoUrl = await _storage.SaveAsync(stream, $"employer-profiles/{employerId}/logo", storedName, ct);
+            }
+            await _db.SaveChangesAsync(ct);
+
+            if (!string.IsNullOrWhiteSpace(oldLogoUrl))
+                await _storage.DeleteAsync(oldLogoUrl, ct);
+
+            return MapToProfileDto(p);
+        }
+
+        private static void ValidateLogoUpload(IFormFile file)
+        {
+            if (file.Length == 0)
+                throw new ArgumentException("Company logo is empty.");
+
+            if (file.Length > MaxLogoBytes)
+                throw new ArgumentException($"Company logo exceeds the {MaxLogoBytes / 1024 / 1024} MB limit.");
+
+            var extension = Path.GetExtension(file.FileName);
+            if (!LogoExtensions.Contains(extension))
+                throw new ArgumentException("Company logo has an unsupported file extension.");
+
+            if (!LogoContentTypes.Contains(file.ContentType))
+                throw new ArgumentException("Company logo has an unsupported content type.");
+        }
+
+        private static EmployerProfileDto MapToProfileDto(EmployerProfile p) => new()
+        {
+            EmployerId = p.EmployerId, CompanyName = p.CompanyName, Industry = p.Industry,
+            CompanySize = p.CompanySize.ToString(), Website = p.Website,
+            Location = p.Location, Description = p.Description, LogoUrl = p.LogoUrl
+        };
 
         // ---- Job lifecycle ----
 

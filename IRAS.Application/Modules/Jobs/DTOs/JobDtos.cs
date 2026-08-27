@@ -12,6 +12,7 @@ namespace IRAS.Application.Modules.Jobs.DTOs
         public string? Website { get; set; }
         public string? Location { get; set; }
         public string? Description { get; set; }
+        public string? LogoUrl { get; set; }
     }
 
     public class UpdateEmployerProfileRequest
