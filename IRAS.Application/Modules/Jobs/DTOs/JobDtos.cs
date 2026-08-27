@@ -146,6 +146,7 @@ namespace IRAS.Application.Modules.Jobs.DTOs
         public DateTime? PostedAt { get; set; }
         public DateTime? ClosingDate { get; set; }
         public string? TemplateKey { get; set; }
+        public int ApplicationCount { get; set; }
         public List<JobRequiredSkillDto> RequiredSkills { get; set; } = new();
     }
 
@@ -162,5 +163,6 @@ namespace IRAS.Application.Modules.Jobs.DTOs
         public DateTime? ClosingDate { get; set; }
         public string? TemplateKey { get; set; }
         public int RequiredSkillCount { get; set; }
+        public int ApplicationCount { get; set; }
     }
 }

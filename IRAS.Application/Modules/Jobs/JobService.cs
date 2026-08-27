@@ -235,7 +235,8 @@ namespace IRAS.Application.Modules.Jobs
                     Location = j.Location, Status = j.Status.ToString(),
                     PostedAt = j.PostedAt, ClosingDate = j.ClosingDate,
                     TemplateKey = j.TemplateKey,
-                    RequiredSkillCount = j.RequiredSkills.Count
+                    RequiredSkillCount = j.RequiredSkills.Count,
+                    ApplicationCount = _db.Applications.Count(a => a.JobId == j.JobId)
                 }).ToListAsync();
         }
 
@@ -261,7 +262,8 @@ namespace IRAS.Application.Modules.Jobs
                     Location = j.Location, Status = j.Status.ToString(),
                     PostedAt = j.PostedAt, ClosingDate = j.ClosingDate,
                     TemplateKey = j.TemplateKey,
-                    RequiredSkillCount = j.RequiredSkills.Count
+                    RequiredSkillCount = j.RequiredSkills.Count,
+                    ApplicationCount = _db.Applications.Count(a => a.JobId == j.JobId)
                 }).ToListAsync();
         }
 
@@ -389,6 +391,7 @@ namespace IRAS.Application.Modules.Jobs
                 .Include(j => j.RequiredSkills).ThenInclude(rs => rs.Skill)
                 .FirstOrDefaultAsync(j => j.JobId == jobId)
                 ?? throw new KeyNotFoundException("Job not found.");
+            var applicationCount = await _db.Applications.CountAsync(a => a.JobId == jobId);
 
             return new JobDto
             {
@@ -408,6 +411,7 @@ namespace IRAS.Application.Modules.Jobs
                 PostedAt = job.PostedAt,
                 ClosingDate = job.ClosingDate,
                 TemplateKey = job.TemplateKey,
+                ApplicationCount = applicationCount,
                 RequiredSkills = job.RequiredSkills.Select(rs => new JobRequiredSkillDto
                 {
                     SkillId = rs.SkillId, SkillName = rs.Skill.SkillName,

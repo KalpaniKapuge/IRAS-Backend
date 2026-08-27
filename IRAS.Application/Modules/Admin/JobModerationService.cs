@@ -42,7 +42,8 @@ namespace IRAS.Application.Modules.Admin
                     PostedAt = j.PostedAt,
                     ClosingDate = j.ClosingDate,
                     TemplateKey = j.TemplateKey,
-                    RequiredSkillCount = j.RequiredSkills.Count
+                    RequiredSkillCount = j.RequiredSkills.Count,
+                    ApplicationCount = _db.Applications.Count(a => a.JobId == j.JobId)
                 })
                 .ToListAsync(ct);
         }

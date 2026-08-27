@@ -196,7 +196,10 @@ builder.Services.AddAuthorization();
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowFrontend", policy =>
-        policy.WithOrigins("http://localhost:5173")   // your Vite dev server
+        // Vite dev server — allow the default port and the next few it falls back to
+        // when 5173 is already taken by another running instance.
+        policy.WithOrigins(
+                  "http://localhost:5173", "http://localhost:5174", "http://localhost:5175", "http://localhost:5176")
               .AllowAnyHeader().AllowAnyMethod());
 });
 
