@@ -41,6 +41,7 @@ namespace IRAS.Application.Modules.Admin
                     Status = j.Status.ToString(),
                     PostedAt = j.PostedAt,
                     ClosingDate = j.ClosingDate,
+                    TemplateKey = j.TemplateKey,
                     RequiredSkillCount = j.RequiredSkills.Count
                 })
                 .ToListAsync(ct);

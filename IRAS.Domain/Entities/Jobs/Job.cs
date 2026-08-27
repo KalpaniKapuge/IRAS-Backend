@@ -20,6 +20,7 @@ namespace IRAS.Domain.Entities.Jobs
         public JobStatus Status { get; set; } = JobStatus.Draft;
         public DateTime? PostedAt { get; set; }
         public DateTime? ClosingDate { get; set; }
+        public string? TemplateKey { get; set; }           // "modern" | "classic" | "bold" — presentation only, chosen before publish
 
         public EmployerProfile Employer { get; set; } = null!;
         public ICollection<JobRequiredSkill> RequiredSkills { get; set; } = new List<JobRequiredSkill>();

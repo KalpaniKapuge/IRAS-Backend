@@ -97,6 +97,37 @@ namespace IRAS.Application.Modules.Jobs.DTOs
         public string JdText { get; set; } = null!;
     }
 
+    // Full edit of a job's role details (title/skills/etc.) — distinct from UpdateJdRequest,
+    // which only ever touches the JD text via a separate endpoint.
+    public class UpdateJobRequest
+    {
+        [Required, StringLength(150)]
+        public string Title { get; set; } = null!;
+
+        [Required, StringLength(50)]
+        public string SeniorityLevel { get; set; } = null!;
+
+        [Range(0, 30)]
+        public int MinExpYears { get; set; }
+
+        [Required]
+        public string EducationReq { get; set; } = null!;
+
+        [Required]
+        public string EmploymentType { get; set; } = null!;
+
+        [StringLength(150)]
+        public string? Location { get; set; }
+
+        public DateTime? ClosingDate { get; set; }
+
+        [MinLength(1, ErrorMessage = "At least one required skill is needed.")]
+        public List<JobRequiredSkillDto> RequiredSkills { get; set; } = new();
+
+        [StringLength(20)]
+        public string? TemplateKey { get; set; }
+    }
+
     public class JobDto
     {
         public int JobId { get; set; }
@@ -114,6 +145,7 @@ namespace IRAS.Application.Modules.Jobs.DTOs
         public string Status { get; set; } = null!;
         public DateTime? PostedAt { get; set; }
         public DateTime? ClosingDate { get; set; }
+        public string? TemplateKey { get; set; }
         public List<JobRequiredSkillDto> RequiredSkills { get; set; } = new();
     }
 
@@ -128,6 +160,7 @@ namespace IRAS.Application.Modules.Jobs.DTOs
         public string Status { get; set; } = null!;
         public DateTime? PostedAt { get; set; }
         public DateTime? ClosingDate { get; set; }
+        public string? TemplateKey { get; set; }
         public int RequiredSkillCount { get; set; }
     }
 }

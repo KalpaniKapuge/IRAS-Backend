@@ -53,6 +53,13 @@ namespace IRAS.API.Controllers
             return Ok(await _service.GetJobAsync(jobId, employerId, "Employer"));
         }
 
+        [HttpPut("{jobId:int}")]
+        public async Task<IActionResult> Update(int employerId, int jobId, UpdateJobRequest request)
+        {
+            var deny = CheckAccess(employerId); if (deny != null) return deny;
+            return Ok(await _service.UpdateJobAsync(employerId, jobId, request));
+        }
+
         [HttpPost("{jobId:int}/generate-jd")]
         public async Task<IActionResult> GenerateJd(int employerId, int jobId, GenerateJdRequest request)
         {

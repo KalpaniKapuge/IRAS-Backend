@@ -124,6 +124,89 @@ namespace IRAS.Application.Modules.Jobs
             }
         }
 
+        public async Task<JobDto> UpdateJobAsync(int employerId, int jobId, UpdateJobRequest request)
+        {
+            var job = await GetOwnedJobAsync(employerId, jobId);
+            if (job.Status == JobStatus.Closed || job.Status == JobStatus.Archived)
+                throw new InvalidOperationException("Cannot edit a closed or archived job.");
+
+            var edu = ParseEnum<EducationLevel>(request.EducationReq, nameof(request.EducationReq));
+            var empType = ParseEnum<EmploymentType>(request.EmploymentType, nameof(request.EmploymentType));
+            if (request.ClosingDate.HasValue && request.ClosingDate.Value.Date <= DateTime.UtcNow.Date)
+                throw new ArgumentException("Closing date must be in the future.");
+
+            var skillIds = request.RequiredSkills.Select(s => s.SkillId).Distinct().ToList();
+            if (skillIds.Count != request.RequiredSkills.Count)
+                throw new ArgumentException("Duplicate skills in the required skills list.");
+
+            var existingIds = await _db.Skills
+                .Where(s => skillIds.Contains(s.SkillId))
+                .Select(s => s.SkillId).ToListAsync();
+            var missing = skillIds.Except(existingIds).ToList();
+            if (missing.Count > 0)
+                throw new KeyNotFoundException($"Skill id(s) not found in taxonomy: {string.Join(", ", missing)}");
+
+            var wasPublished = job.Status == JobStatus.Published;
+            var oldSkillIds = await _db.JobRequiredSkills
+                .Where(rs => rs.JobId == jobId)
+                .Select(rs => rs.SkillId).ToListAsync();
+            var newSkillIds = skillIds.ToHashSet();
+            var skillsChanged = !oldSkillIds.ToHashSet().SetEquals(newSkillIds);
+
+            await using var tx = await _db.Database.BeginTransactionAsync();
+            try
+            {
+                job.Title = request.Title.Trim();
+                job.SeniorityLevel = request.SeniorityLevel.Trim();
+                job.MinExpYears = request.MinExpYears;
+                job.EducationReq = edu;
+                job.EmploymentType = empType;
+                job.Location = request.Location;
+                job.ClosingDate = request.ClosingDate;
+                job.TemplateKey = request.TemplateKey;
+
+                var currentSkills = _db.JobRequiredSkills.Where(rs => rs.JobId == jobId);
+                _db.JobRequiredSkills.RemoveRange(currentSkills);
+                await _db.SaveChangesAsync();
+
+                foreach (var rs in request.RequiredSkills)
+                {
+                    var importance = ParseEnum<ImportanceLevel>(rs.Importance, nameof(rs.Importance));
+                    _db.JobRequiredSkills.Add(new JobRequiredSkill
+                    {
+                        JobId = job.JobId,
+                        SkillId = rs.SkillId,
+                        Importance = importance,
+                        Weight = rs.Weight ?? (importance == ImportanceLevel.MustHave ? 1.0m : 0.5m),
+                        MinYears = rs.MinYears
+                    });
+                }
+                await _db.SaveChangesAsync();
+                await tx.CommitAsync();
+            }
+            catch
+            {
+                await tx.RollbackAsync();
+                throw;
+            }
+
+            // Re-matching is best-effort, same contract as PublishJobAsync: a failure here
+            // must never fail the edit itself.
+            if (wasPublished && skillsChanged)
+            {
+                try
+                {
+                    await _matchingService.RunMatchingForJobAsync(jobId, CancellationToken.None);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Re-matching failed for job {JobId} after edit", jobId);
+                }
+            }
+
+            return await GetJobInternalAsync(jobId);
+        }
+
         public async Task<JobDto> GetJobAsync(int jobId, int requesterId, string requesterRole)
         {
             var job = await GetJobInternalAsync(jobId);
@@ -151,6 +234,7 @@ namespace IRAS.Application.Modules.Jobs
                     EmploymentType = j.EmploymentType.ToString(),
                     Location = j.Location, Status = j.Status.ToString(),
                     PostedAt = j.PostedAt, ClosingDate = j.ClosingDate,
+                    TemplateKey = j.TemplateKey,
                     RequiredSkillCount = j.RequiredSkills.Count
                 }).ToListAsync();
         }
@@ -176,6 +260,7 @@ namespace IRAS.Application.Modules.Jobs
                     EmploymentType = j.EmploymentType.ToString(),
                     Location = j.Location, Status = j.Status.ToString(),
                     PostedAt = j.PostedAt, ClosingDate = j.ClosingDate,
+                    TemplateKey = j.TemplateKey,
                     RequiredSkillCount = j.RequiredSkills.Count
                 }).ToListAsync();
         }
@@ -238,6 +323,8 @@ namespace IRAS.Application.Modules.Jobs
                 .AnyAsync(j => j.JobId == jobId && j.Importance == ImportanceLevel.MustHave);
             if (!hasMustHave)
                 throw new InvalidOperationException("At least one must-have skill is required before publishing.");
+            if (string.IsNullOrWhiteSpace(job.TemplateKey))
+                throw new InvalidOperationException("Select a job post template before publishing.");
 
             job.Status = JobStatus.Published;
             job.PostedAt = DateTime.UtcNow;
@@ -320,6 +407,7 @@ namespace IRAS.Application.Modules.Jobs
                 Status = job.Status.ToString(),
                 PostedAt = job.PostedAt,
                 ClosingDate = job.ClosingDate,
+                TemplateKey = job.TemplateKey,
                 RequiredSkills = job.RequiredSkills.Select(rs => new JobRequiredSkillDto
                 {
                     SkillId = rs.SkillId, SkillName = rs.Skill.SkillName,

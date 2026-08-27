@@ -9,6 +9,7 @@ namespace IRAS.Application.Modules.Jobs
         Task UpdateEmployerProfileAsync(int employerId, UpdateEmployerProfileRequest request);
 
         Task<JobDto> CreateJobAsync(int employerId, CreateJobRequest request);
+        Task<JobDto> UpdateJobAsync(int employerId, int jobId, UpdateJobRequest request);
         Task<JobDto> GetJobAsync(int jobId, int requesterId, string requesterRole);
         Task<List<JobSummaryDto>> GetMyJobsAsync(int employerId);
         Task<List<JobSummaryDto>> GetPublishedJobsAsync(string? query);
