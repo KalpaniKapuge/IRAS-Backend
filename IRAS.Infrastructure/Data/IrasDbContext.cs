@@ -23,6 +23,8 @@ namespace IRAS.Infrastructure.Data
         public DbSet<Education> Educations => Set<Education>();
         public DbSet<WorkExperience> WorkExperiences => Set<WorkExperience>();
         public DbSet<Certification> Certifications => Set<Certification>();
+        public DbSet<CandidateLanguage> CandidateLanguages => Set<CandidateLanguage>();
+        public DbSet<CandidateProject> CandidateProjects => Set<CandidateProject>();
         public DbSet<Skill> Skills => Set<Skill>();
         public DbSet<SkillAlias> SkillAliases => Set<SkillAlias>();
         public DbSet<CandidateSkill> CandidateSkills => Set<CandidateSkill>();

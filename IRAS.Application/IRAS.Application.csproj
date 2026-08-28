@@ -20,6 +20,14 @@
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- Embedded (not deployed as loose files) so CvPdfRenderer can register the exact same
+         Roboto weights the web app loads from Google Fonts (see frontend's index.html and
+         tailwind.config.ts) — this is what makes the downloaded PDF's typography match the
+         live CV preview instead of falling back to QuestPDF's default font. -->
+    <EmbeddedResource Include="Resources\Fonts\*.ttf" />
+  </ItemGroup>
+
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>

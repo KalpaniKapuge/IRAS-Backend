@@ -23,6 +23,14 @@ namespace IRAS.Application.Modules.Candidates
         Task<CertificationDto> UploadCertificationFileAsync(int candidateId, int certificationId, IFormFile file, CancellationToken ct);
         Task DeleteCertificationAsync(int candidateId, int certificationId);
 
+        Task<LanguageDto> AddLanguageAsync(int candidateId, LanguageDto dto);
+        Task UpdateLanguageAsync(int candidateId, int languageId, LanguageDto dto);
+        Task DeleteLanguageAsync(int candidateId, int languageId);
+
+        Task<ProjectDto> AddProjectAsync(int candidateId, ProjectDto dto);
+        Task UpdateProjectAsync(int candidateId, int projectId, ProjectDto dto);
+        Task DeleteProjectAsync(int candidateId, int projectId);
+
         Task UpsertSkillAsync(int candidateId, UpsertCandidateSkillRequest request);
         Task RemoveSkillAsync(int candidateId, int skillId);
     }

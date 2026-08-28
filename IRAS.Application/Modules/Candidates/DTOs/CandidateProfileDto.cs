@@ -20,6 +20,8 @@ namespace IRAS.Application.Modules.Candidates.DTOs
         public List<EducationDto> Educations { get; set; } = new();
         public List<WorkExperienceDto> WorkExperiences { get; set; } = new();
         public List<CertificationDto> Certifications { get; set; } = new();
+        public List<LanguageDto> Languages { get; set; } = new();
+        public List<ProjectDto> Projects { get; set; } = new();
         public List<CandidateSkillDto> Skills { get; set; } = new();
     }
 
@@ -125,6 +127,34 @@ namespace IRAS.Application.Modules.Candidates.DTOs
 
         public Microsoft.AspNetCore.Http.IFormFile? File { get; set; }
         public Microsoft.AspNetCore.Http.IFormFile? CertificateFile { get; set; }
+    }
+
+    public class LanguageDto
+    {
+        public int LanguageId { get; set; }
+
+        [Required, StringLength(100)]
+        public string LanguageName { get; set; } = null!;
+
+        [Required, StringLength(50)]
+        public string Proficiency { get; set; } = null!;
+    }
+
+    public class ProjectDto
+    {
+        public int ProjectId { get; set; }
+
+        [Required, StringLength(150)]
+        public string Title { get; set; } = null!;
+
+        [StringLength(2000)]
+        public string? Description { get; set; }
+
+        [Url, StringLength(300)]
+        public string? ProjectUrl { get; set; }
+
+        public DateTime? StartDate { get; set; }
+        public DateTime? EndDate { get; set; }
     }
 
     public class CandidateSkillDto

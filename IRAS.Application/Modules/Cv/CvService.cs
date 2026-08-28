@@ -1,5 +1,7 @@
 // IRAS.Application/Modules/Cv/CvService.cs
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
+using IRAS.Application.Common.Storage;
 using IRAS.Application.Modules.Cv.DTOs;
 using IRAS.Domain.Entities.Candidate;
 using IRAS.Domain.Enums;
@@ -17,15 +19,29 @@ namespace IRAS.Application.Modules.Cv
         };
 
         private static readonly string[] DefaultSectionOrder =
-            { "Summary", "Skills", "Experience", "Education", "Certifications" };
+            { "Summary", "Skills", "Experience", "Education", "Certifications", "Languages", "Projects" };
+
+        private const long MaxPhotoBytes = 2 * 1024 * 1024;
+
+        private static readonly HashSet<string> PhotoExtensions = new(StringComparer.OrdinalIgnoreCase)
+        {
+            ".jpg", ".jpeg", ".png", ".webp"
+        };
+
+        private static readonly HashSet<string> PhotoContentTypes = new(StringComparer.OrdinalIgnoreCase)
+        {
+            "image/jpeg", "image/png", "image/webp"
+        };
 
         private readonly IrasDbContext _db;
         private readonly ICvPdfRenderer _renderer;
+        private readonly IFileStorage _storage;
 
-        public CvService(IrasDbContext db, ICvPdfRenderer renderer)
+        public CvService(IrasDbContext db, ICvPdfRenderer renderer, IFileStorage storage)
         {
             _db = db;
             _renderer = renderer;
+            _storage = storage;
         }
 
         public List<CvTemplateDto> GetAvailableTemplates() => Templates;
@@ -37,7 +53,8 @@ namespace IRAS.Application.Modules.Cv
                 .OrderByDescending(c => c.UpdatedAt)
                 .Select(c => new CvSummaryDto
                 {
-                    CvId = c.CvId, Title = c.Title, TemplateName = c.TemplateName, UpdatedAt = c.UpdatedAt
+                    CvId = c.CvId, Title = c.Title, TemplateName = c.TemplateName,
+                    PhotoUrl = c.PhotoUrl, UpdatedAt = c.UpdatedAt
                 })
                 .ToListAsync(ct);
         }
@@ -49,12 +66,21 @@ namespace IRAS.Application.Modules.Cv
             var explicitItems = await _db.CvSectionItems.Where(i => i.CvId == cvId).ToListAsync(ct);
             var customized = ParseCustomizedTypes(cv.CustomizedReferenceTypes);
 
+            var resolved = ResolveContent(profile, explicitItems, customized);
+
             return new CvDetailDto
             {
                 CvId = cv.CvId,
                 Title = cv.Title,
                 TemplateName = cv.TemplateName,
                 Summary = cv.Summary,
+                PhotoUrl = cv.PhotoUrl,
+                FullName = $"{profile.FirstName} {profile.LastName}",
+                Headline = profile.Headline,
+                Email = profile.User.Email,
+                Phone = profile.Phone,
+                GithubUrl = profile.GithubUrl,
+                LinkedInUrl = profile.LinkedInUrl,
                 SectionOrder = ParseSectionOrder(cv.SectionOrder),
                 Education = BuildItemDtos(
                     profile.Educations.Select(e => (e.EducationId, $"{e.Degree} — {e.Institution}")),
@@ -68,6 +94,18 @@ namespace IRAS.Application.Modules.Cv
                 Skills = BuildItemDtos(
                     profile.CandidateSkills.Select(s => (s.SkillId, s.Skill.SkillName)),
                     explicitItems, CvReferenceType.Skill, customized),
+                Languages = BuildItemDtos(
+                    profile.Languages.Select(l => (l.LanguageId, $"{l.LanguageName} ({l.Proficiency})")),
+                    explicitItems, CvReferenceType.Language, customized),
+                Projects = BuildItemDtos(
+                    profile.Projects.Select(p => (p.ProjectId, p.Title)),
+                    explicitItems, CvReferenceType.Project, customized),
+                ResolvedEducation = resolved.Education,
+                ResolvedExperience = resolved.Experience,
+                ResolvedCertifications = resolved.Certifications,
+                ResolvedSkills = resolved.Skills,
+                ResolvedLanguages = resolved.Languages,
+                ResolvedProjects = resolved.Projects,
                 CreatedAt = cv.CreatedAt,
                 UpdatedAt = cv.UpdatedAt
             };
@@ -108,6 +146,44 @@ namespace IRAS.Application.Modules.Cv
             await _db.SaveChangesAsync(ct);
         }
 
+        public async Task<CvDetailDto> UploadCvPhotoAsync(int candidateId, int cvId, IFormFile file, CancellationToken ct)
+        {
+            var cv = await GetOwnedCvAsync(candidateId, cvId, ct);
+            ValidatePhotoUpload(file);
+
+            var oldPhotoUrl = cv.PhotoUrl;
+            var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
+            var storedName = $"{Guid.NewGuid():N}{extension}";
+
+            await using (var stream = file.OpenReadStream())
+            {
+                cv.PhotoUrl = await _storage.SaveAsync(stream, $"cv-documents/{cvId}/photo", storedName, ct);
+            }
+            cv.UpdatedAt = DateTime.UtcNow;
+            await _db.SaveChangesAsync(ct);
+
+            if (!string.IsNullOrWhiteSpace(oldPhotoUrl))
+                await _storage.DeleteAsync(oldPhotoUrl, ct);
+
+            return await GetCvDetailAsync(candidateId, cvId, ct);
+        }
+
+        private static void ValidatePhotoUpload(IFormFile file)
+        {
+            if (file.Length == 0)
+                throw new ArgumentException("CV photo is empty.");
+
+            if (file.Length > MaxPhotoBytes)
+                throw new ArgumentException($"CV photo exceeds the {MaxPhotoBytes / 1024 / 1024} MB limit.");
+
+            var extension = Path.GetExtension(file.FileName);
+            if (!PhotoExtensions.Contains(extension))
+                throw new ArgumentException("CV photo has an unsupported file extension.");
+
+            if (!PhotoContentTypes.Contains(file.ContentType))
+                throw new ArgumentException("CV photo has an unsupported content type.");
+        }
+
         public async Task UpdateSectionItemsAsync(int candidateId, int cvId, UpdateCvSectionItemsRequest request, CancellationToken ct)
         {
             var cv = await GetOwnedCvAsync(candidateId, cvId, ct);
@@ -123,6 +199,8 @@ namespace IRAS.Application.Modules.Cv
                 CvReferenceType.Experience => profile.WorkExperiences.Select(w => w.ExperienceId).ToHashSet(),
                 CvReferenceType.Certification => profile.Certifications.Select(c => c.CertificationId).ToHashSet(),
                 CvReferenceType.Skill => profile.CandidateSkills.Select(s => s.SkillId).ToHashSet(),
+                CvReferenceType.Language => profile.Languages.Select(l => l.LanguageId).ToHashSet(),
+                CvReferenceType.Project => profile.Projects.Select(p => p.ProjectId).ToHashSet(),
                 _ => new HashSet<int>()
             };
             if (request.ReferenceIds.Any(id => !validIds.Contains(id)))
@@ -163,15 +241,23 @@ namespace IRAS.Application.Modules.Cv
             var explicitItems = await _db.CvSectionItems.Where(i => i.CvId == cvId).ToListAsync(ct);
             var customized = ParseCustomizedTypes(cv.CustomizedReferenceTypes);
 
-            var educationIds = ResolveOrder(explicitItems, CvReferenceType.Education, profile.Educations.Select(e => e.EducationId), customized);
-            var experienceIds = ResolveOrder(explicitItems, CvReferenceType.Experience, profile.WorkExperiences.Select(w => w.ExperienceId), customized);
-            var certificationIds = ResolveOrder(explicitItems, CvReferenceType.Certification, profile.Certifications.Select(c => c.CertificationId), customized);
-            var skillIds = ResolveOrder(explicitItems, CvReferenceType.Skill, profile.CandidateSkills.Select(s => s.SkillId), customized);
+            var resolved = ResolveContent(profile, explicitItems, customized);
 
-            var educationById = profile.Educations.ToDictionary(e => e.EducationId);
-            var experienceById = profile.WorkExperiences.ToDictionary(w => w.ExperienceId);
-            var certById = profile.Certifications.ToDictionary(c => c.CertificationId);
-            var skillById = profile.CandidateSkills.ToDictionary(s => s.SkillId);
+            byte[]? photoBytes = null;
+            if (!string.IsNullOrWhiteSpace(cv.PhotoUrl))
+            {
+                try
+                {
+                    await using var photoStream = await _storage.OpenReadAsync(cv.PhotoUrl, ct);
+                    using var buffer = new MemoryStream();
+                    await photoStream.CopyToAsync(buffer, ct);
+                    photoBytes = buffer.ToArray();
+                }
+                catch
+                {
+                    // A missing/unreachable photo should never block downloading the rest of the CV.
+                }
+            }
 
             var data = new RenderedCvData
             {
@@ -182,23 +268,14 @@ namespace IRAS.Application.Modules.Cv
                 GithubUrl = profile.GithubUrl,
                 LinkedInUrl = profile.LinkedInUrl,
                 Summary = cv.Summary,
+                PhotoBytes = photoBytes,
                 SectionOrder = ParseSectionOrder(cv.SectionOrder),
-                Education = educationIds.Where(educationById.ContainsKey).Select(id =>
-                {
-                    var e = educationById[id];
-                    return new RenderedEducation(e.Degree, e.Institution, e.FieldOfStudy, e.StartYear, e.EndYear, e.Grade);
-                }).ToList(),
-                Experience = experienceIds.Where(experienceById.ContainsKey).Select(id =>
-                {
-                    var w = experienceById[id];
-                    return new RenderedExperience(w.JobTitle, w.CompanyName, w.StartDate, w.EndDate, w.IsCurrent, w.Description);
-                }).ToList(),
-                Certifications = certificationIds.Where(certById.ContainsKey).Select(id =>
-                {
-                    var c = certById[id];
-                    return new RenderedCertification(c.Name, c.IssuingOrg, c.IssueDate);
-                }).ToList(),
-                Skills = skillIds.Where(skillById.ContainsKey).Select(id => skillById[id].Skill.SkillName).ToList()
+                Education = resolved.Education,
+                Experience = resolved.Experience,
+                Certifications = resolved.Certifications,
+                Skills = resolved.Skills,
+                Languages = resolved.Languages,
+                Projects = resolved.Projects
             };
 
             return _renderer.Render(cv.TemplateName, data);
@@ -222,6 +299,8 @@ namespace IRAS.Application.Modules.Cv
                 .Include(c => c.Educations)
                 .Include(c => c.WorkExperiences)
                 .Include(c => c.Certifications)
+                .Include(c => c.Languages)
+                .Include(c => c.Projects)
                 .Include(c => c.CandidateSkills).ThenInclude(cs => cs.Skill)
                 .FirstOrDefaultAsync(c => c.CandidateId == candidateId, ct)
                 ?? throw new KeyNotFoundException("Candidate profile not found.");
@@ -273,6 +352,79 @@ namespace IRAS.Application.Modules.Cv
 
             return explicitItems.Where(i => i.ReferenceType == type)
                 .OrderBy(i => i.OrderIndex).Select(i => i.ReferenceId).ToList();
+        }
+
+        // Resolves the final, ordered, fully-detailed content for whichever items are
+        // currently included — shared by GetCvDetailAsync (web preview) and RenderPdfAsync
+        // (PDF), so the two never drift out of sync with each other.
+        private static (
+            List<CvResolvedEducationDto> Education,
+            List<CvResolvedExperienceDto> Experience,
+            List<CvResolvedCertificationDto> Certifications,
+            List<string> Skills,
+            List<CvResolvedLanguageDto> Languages,
+            List<CvResolvedProjectDto> Projects) ResolveContent(
+                CandidateProfile profile, List<CvSectionItem> explicitItems, HashSet<string> customized)
+        {
+            var educationIds = ResolveOrder(explicitItems, CvReferenceType.Education, profile.Educations.Select(e => e.EducationId), customized);
+            var experienceIds = ResolveOrder(explicitItems, CvReferenceType.Experience, profile.WorkExperiences.Select(w => w.ExperienceId), customized);
+            var certificationIds = ResolveOrder(explicitItems, CvReferenceType.Certification, profile.Certifications.Select(c => c.CertificationId), customized);
+            var skillIds = ResolveOrder(explicitItems, CvReferenceType.Skill, profile.CandidateSkills.Select(s => s.SkillId), customized);
+            var languageIds = ResolveOrder(explicitItems, CvReferenceType.Language, profile.Languages.Select(l => l.LanguageId), customized);
+            var projectIds = ResolveOrder(explicitItems, CvReferenceType.Project, profile.Projects.Select(p => p.ProjectId), customized);
+
+            var educationById = profile.Educations.ToDictionary(e => e.EducationId);
+            var experienceById = profile.WorkExperiences.ToDictionary(w => w.ExperienceId);
+            var certById = profile.Certifications.ToDictionary(c => c.CertificationId);
+            var skillById = profile.CandidateSkills.ToDictionary(s => s.SkillId);
+            var languageById = profile.Languages.ToDictionary(l => l.LanguageId);
+            var projectById = profile.Projects.ToDictionary(p => p.ProjectId);
+
+            var education = educationIds.Where(educationById.ContainsKey).Select(id =>
+            {
+                var e = educationById[id];
+                return new CvResolvedEducationDto
+                {
+                    Degree = e.Degree, Institution = e.Institution, FieldOfStudy = e.FieldOfStudy,
+                    StartYear = e.StartYear, EndYear = e.EndYear, Grade = e.Grade
+                };
+            }).ToList();
+
+            var experience = experienceIds.Where(experienceById.ContainsKey).Select(id =>
+            {
+                var w = experienceById[id];
+                return new CvResolvedExperienceDto
+                {
+                    JobTitle = w.JobTitle, CompanyName = w.CompanyName, StartDate = w.StartDate,
+                    EndDate = w.EndDate, IsCurrent = w.IsCurrent, Description = w.Description
+                };
+            }).ToList();
+
+            var certifications = certificationIds.Where(certById.ContainsKey).Select(id =>
+            {
+                var c = certById[id];
+                return new CvResolvedCertificationDto { Name = c.Name, IssuingOrg = c.IssuingOrg, IssueDate = c.IssueDate };
+            }).ToList();
+
+            var skills = skillIds.Where(skillById.ContainsKey).Select(id => skillById[id].Skill.SkillName).ToList();
+
+            var languages = languageIds.Where(languageById.ContainsKey).Select(id =>
+            {
+                var l = languageById[id];
+                return new CvResolvedLanguageDto { LanguageName = l.LanguageName, Proficiency = l.Proficiency };
+            }).ToList();
+
+            var projects = projectIds.Where(projectById.ContainsKey).Select(id =>
+            {
+                var p = projectById[id];
+                return new CvResolvedProjectDto
+                {
+                    Title = p.Title, Description = p.Description, ProjectUrl = p.ProjectUrl,
+                    StartDate = p.StartDate, EndDate = p.EndDate
+                };
+            }).ToList();
+
+            return (education, experience, certifications, skills, languages, projects);
         }
 
         private static HashSet<string> ParseCustomizedTypes(string raw) =>

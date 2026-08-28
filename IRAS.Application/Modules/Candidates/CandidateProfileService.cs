@@ -55,6 +55,8 @@ namespace IRAS.Application.Modules.Candidates
                 .Include(c => c.Educations)
                 .Include(c => c.WorkExperiences)
                 .Include(c => c.Certifications)
+                .Include(c => c.Languages)
+                .Include(c => c.Projects)
                 .Include(c => c.CandidateSkills).ThenInclude(cs => cs.Skill)
                 .FirstOrDefaultAsync(c => c.CandidateId == candidateId)
                 ?? throw new KeyNotFoundException("Candidate profile not found.");
@@ -302,6 +304,84 @@ namespace IRAS.Application.Modules.Candidates
             await DeleteStoredFileIfPresentAsync(entity.CertificateFileUrl, CancellationToken.None);
         }
 
+        public async Task<LanguageDto> AddLanguageAsync(int candidateId, LanguageDto dto)
+        {
+            await GetOwnedProfileAsync(candidateId);
+
+            var entity = new CandidateLanguage
+            {
+                CandidateId = candidateId,
+                LanguageName = dto.LanguageName,
+                Proficiency = dto.Proficiency
+            };
+            _db.CandidateLanguages.Add(entity);
+            await _db.SaveChangesAsync();
+            dto.LanguageId = entity.LanguageId;
+            return dto;
+        }
+
+        public async Task UpdateLanguageAsync(int candidateId, int languageId, LanguageDto dto)
+        {
+            var entity = await _db.CandidateLanguages
+                .FirstOrDefaultAsync(l => l.LanguageId == languageId && l.CandidateId == candidateId)
+                ?? throw new KeyNotFoundException("Language record not found.");
+
+            entity.LanguageName = dto.LanguageName;
+            entity.Proficiency = dto.Proficiency;
+            await _db.SaveChangesAsync();
+        }
+
+        public async Task DeleteLanguageAsync(int candidateId, int languageId)
+        {
+            var entity = await _db.CandidateLanguages
+                .FirstOrDefaultAsync(l => l.LanguageId == languageId && l.CandidateId == candidateId)
+                ?? throw new KeyNotFoundException("Language record not found.");
+            _db.CandidateLanguages.Remove(entity);
+            await _db.SaveChangesAsync();
+        }
+
+        public async Task<ProjectDto> AddProjectAsync(int candidateId, ProjectDto dto)
+        {
+            await GetOwnedProfileAsync(candidateId);
+
+            var entity = new CandidateProject
+            {
+                CandidateId = candidateId,
+                Title = dto.Title,
+                Description = dto.Description,
+                ProjectUrl = dto.ProjectUrl,
+                StartDate = dto.StartDate,
+                EndDate = dto.EndDate
+            };
+            _db.CandidateProjects.Add(entity);
+            await _db.SaveChangesAsync();
+            dto.ProjectId = entity.ProjectId;
+            return dto;
+        }
+
+        public async Task UpdateProjectAsync(int candidateId, int projectId, ProjectDto dto)
+        {
+            var entity = await _db.CandidateProjects
+                .FirstOrDefaultAsync(p => p.ProjectId == projectId && p.CandidateId == candidateId)
+                ?? throw new KeyNotFoundException("Project record not found.");
+
+            entity.Title = dto.Title;
+            entity.Description = dto.Description;
+            entity.ProjectUrl = dto.ProjectUrl;
+            entity.StartDate = dto.StartDate;
+            entity.EndDate = dto.EndDate;
+            await _db.SaveChangesAsync();
+        }
+
+        public async Task DeleteProjectAsync(int candidateId, int projectId)
+        {
+            var entity = await _db.CandidateProjects
+                .FirstOrDefaultAsync(p => p.ProjectId == projectId && p.CandidateId == candidateId)
+                ?? throw new KeyNotFoundException("Project record not found.");
+            _db.CandidateProjects.Remove(entity);
+            await _db.SaveChangesAsync();
+        }
+
         public async Task UpsertSkillAsync(int candidateId, UpsertCandidateSkillRequest request)
         {
             await GetOwnedProfileAsync(candidateId);
@@ -455,6 +535,15 @@ namespace IRAS.Application.Modules.Candidates
                 IssueDate = c.IssueDate, ExpiryDate = c.ExpiryDate,
                 CertificateFileUrl = c.CertificateFileUrl, CertificateFileName = c.CertificateFileName,
                 CertificateContentType = c.CertificateContentType
+            }).ToList(),
+            Languages = p.Languages.Select(l => new LanguageDto
+            {
+                LanguageId = l.LanguageId, LanguageName = l.LanguageName, Proficiency = l.Proficiency
+            }).ToList(),
+            Projects = p.Projects.Select(pr => new ProjectDto
+            {
+                ProjectId = pr.ProjectId, Title = pr.Title, Description = pr.Description,
+                ProjectUrl = pr.ProjectUrl, StartDate = pr.StartDate, EndDate = pr.EndDate
             }).ToList(),
             Skills = p.CandidateSkills.Select(cs => new CandidateSkillDto
             {

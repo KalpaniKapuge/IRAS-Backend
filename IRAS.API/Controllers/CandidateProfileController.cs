@@ -151,6 +151,52 @@ namespace IRAS.API.Controllers
             return NoContent();
         }
 
+        [HttpPost("languages")]
+        public async Task<IActionResult> AddLanguage(int candidateId, LanguageDto dto)
+        {
+            var deny = CheckAccess(candidateId); if (deny != null) return deny;
+            return Ok(await _service.AddLanguageAsync(candidateId, dto));
+        }
+
+        [HttpPut("languages/{languageId:int}")]
+        public async Task<IActionResult> UpdateLanguage(int candidateId, int languageId, LanguageDto dto)
+        {
+            var deny = CheckAccess(candidateId); if (deny != null) return deny;
+            await _service.UpdateLanguageAsync(candidateId, languageId, dto);
+            return NoContent();
+        }
+
+        [HttpDelete("languages/{languageId:int}")]
+        public async Task<IActionResult> DeleteLanguage(int candidateId, int languageId)
+        {
+            var deny = CheckAccess(candidateId); if (deny != null) return deny;
+            await _service.DeleteLanguageAsync(candidateId, languageId);
+            return NoContent();
+        }
+
+        [HttpPost("projects")]
+        public async Task<IActionResult> AddProject(int candidateId, ProjectDto dto)
+        {
+            var deny = CheckAccess(candidateId); if (deny != null) return deny;
+            return Ok(await _service.AddProjectAsync(candidateId, dto));
+        }
+
+        [HttpPut("projects/{projectId:int}")]
+        public async Task<IActionResult> UpdateProject(int candidateId, int projectId, ProjectDto dto)
+        {
+            var deny = CheckAccess(candidateId); if (deny != null) return deny;
+            await _service.UpdateProjectAsync(candidateId, projectId, dto);
+            return NoContent();
+        }
+
+        [HttpDelete("projects/{projectId:int}")]
+        public async Task<IActionResult> DeleteProject(int candidateId, int projectId)
+        {
+            var deny = CheckAccess(candidateId); if (deny != null) return deny;
+            await _service.DeleteProjectAsync(candidateId, projectId);
+            return NoContent();
+        }
+
         [HttpPut("skills")]
         public async Task<IActionResult> UpsertSkill(int candidateId, UpsertCandidateSkillRequest request)
         {

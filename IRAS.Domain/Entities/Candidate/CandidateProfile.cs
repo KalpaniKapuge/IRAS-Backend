@@ -26,6 +26,8 @@ namespace IRAS.Domain.Entities.Candidate
         public ICollection<Education> Educations { get; set; } = new List<Education>();
         public ICollection<WorkExperience> WorkExperiences { get; set; } = new List<WorkExperience>();
         public ICollection<Certification> Certifications { get; set; } = new List<Certification>();
+        public ICollection<CandidateLanguage> Languages { get; set; } = new List<CandidateLanguage>();
+        public ICollection<CandidateProject> Projects { get; set; } = new List<CandidateProject>();
         public ICollection<CandidateSkill> CandidateSkills { get; set; } = new List<CandidateSkill>();
         public ICollection<CandidateTargetSkill> TargetSkills { get; set; } = new List<CandidateTargetSkill>();
     }

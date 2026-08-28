@@ -2,6 +2,7 @@
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
@@ -228,6 +229,20 @@ else
         context.Response.ContentType = "application/json";
         await context.Response.WriteAsJsonAsync(new { message = "An unexpected error occurred." });
     }));
+}
+
+// Serves files saved by LocalDiskFileStorage as real, fetchable URLs (logos,
+// certificates, profile pictures) — mirrors Supabase Storage's public URLs so
+// the two providers behave identically to everything that consumes IFileStorage.
+var uploadsRoot = builder.Configuration["FileStorage:ResumeRootPath"];
+if (!string.IsNullOrWhiteSpace(uploadsRoot))
+{
+    Directory.CreateDirectory(uploadsRoot);
+    app.UseStaticFiles(new StaticFileOptions
+    {
+        FileProvider = new PhysicalFileProvider(uploadsRoot),
+        RequestPath = "/uploads",
+    });
 }
 
 app.UseCors("AllowFrontend");

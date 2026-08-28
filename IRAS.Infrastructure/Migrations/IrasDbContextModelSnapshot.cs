@@ -279,6 +279,32 @@ namespace IRAS.Infrastructure.Migrations
                     b.ToTable("SkillGaps", "applications");
                 });
 
+            modelBuilder.Entity("IRAS.Domain.Entities.Candidate.CandidateLanguage", b =>
+                {
+                    b.Property<int>("LanguageId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("LanguageId"));
+
+                    b.Property<int>("CandidateId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("LanguageName")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Proficiency")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("LanguageId");
+
+                    b.HasIndex("CandidateId");
+
+                    b.ToTable("CandidateLanguages", "candidate");
+                });
+
             modelBuilder.Entity("IRAS.Domain.Entities.Candidate.CandidateProfile", b =>
                 {
                     b.Property<int>("CandidateId")
@@ -327,6 +353,40 @@ namespace IRAS.Infrastructure.Migrations
                     b.HasKey("CandidateId");
 
                     b.ToTable("CandidateProfiles", "candidate");
+                });
+
+            modelBuilder.Entity("IRAS.Domain.Entities.Candidate.CandidateProject", b =>
+                {
+                    b.Property<int>("ProjectId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("ProjectId"));
+
+                    b.Property<int>("CandidateId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Description")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("EndDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("ProjectUrl")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("StartDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("ProjectId");
+
+                    b.HasIndex("CandidateId");
+
+                    b.ToTable("CandidateProjects", "candidate");
                 });
 
             modelBuilder.Entity("IRAS.Domain.Entities.Candidate.Certification", b =>
@@ -385,6 +445,9 @@ namespace IRAS.Infrastructure.Migrations
 
                     b.Property<string>("CustomizedReferenceTypes")
                         .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("PhotoUrl")
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("SectionOrder")
@@ -1186,6 +1249,17 @@ namespace IRAS.Infrastructure.Migrations
                     b.Navigation("Skill");
                 });
 
+            modelBuilder.Entity("IRAS.Domain.Entities.Candidate.CandidateLanguage", b =>
+                {
+                    b.HasOne("IRAS.Domain.Entities.Candidate.CandidateProfile", "Candidate")
+                        .WithMany("Languages")
+                        .HasForeignKey("CandidateId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Candidate");
+                });
+
             modelBuilder.Entity("IRAS.Domain.Entities.Candidate.CandidateProfile", b =>
                 {
                     b.HasOne("IRAS.Domain.Entities.Identity.User", "User")
@@ -1195,6 +1269,17 @@ namespace IRAS.Infrastructure.Migrations
                         .IsRequired();
 
                     b.Navigation("User");
+                });
+
+            modelBuilder.Entity("IRAS.Domain.Entities.Candidate.CandidateProject", b =>
+                {
+                    b.HasOne("IRAS.Domain.Entities.Candidate.CandidateProfile", "Candidate")
+                        .WithMany("Projects")
+                        .HasForeignKey("CandidateId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Candidate");
                 });
 
             modelBuilder.Entity("IRAS.Domain.Entities.Candidate.Certification", b =>
@@ -1460,6 +1545,10 @@ namespace IRAS.Infrastructure.Migrations
                     b.Navigation("Certifications");
 
                     b.Navigation("Educations");
+
+                    b.Navigation("Languages");
+
+                    b.Navigation("Projects");
 
                     b.Navigation("Resumes");
 

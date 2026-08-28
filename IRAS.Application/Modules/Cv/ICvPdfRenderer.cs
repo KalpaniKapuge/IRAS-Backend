@@ -1,14 +1,14 @@
 // IRAS.Application/Modules/Cv/ICvPdfRenderer.cs
+using IRAS.Application.Modules.Cv.DTOs;
+
 namespace IRAS.Application.Modules.Cv
 {
-    public record RenderedEducation(string Degree, string Institution, string? FieldOfStudy, int? StartYear, int? EndYear, string? Grade);
-    public record RenderedExperience(string JobTitle, string CompanyName, DateTime StartDate, DateTime? EndDate, bool IsCurrent, string? Description);
-    public record RenderedCertification(string Name, string? IssuingOrg, DateTime? IssueDate);
-
     // Fully resolved CV content, independent of the database — CvService builds this from
     // the candidate's live profile data plus the CvDocument's customization (summary,
     // section order, chosen/ordered items), and hands it to the renderer. Keeping this
     // separate from the EF entities means template code never touches the DbContext.
+    // Reuses the same CvResolved*Dto shapes the API returns for the web preview (built by
+    // the same resolution helper in CvService), rather than a parallel set of record types.
     public class RenderedCvData
     {
         public string FullName { get; set; } = null!;
@@ -18,11 +18,14 @@ namespace IRAS.Application.Modules.Cv
         public string? GithubUrl { get; set; }
         public string? LinkedInUrl { get; set; }
         public string? Summary { get; set; }
+        public byte[]? PhotoBytes { get; set; }
         public List<string> SectionOrder { get; set; } = new();
-        public List<RenderedEducation> Education { get; set; } = new();
-        public List<RenderedExperience> Experience { get; set; } = new();
-        public List<RenderedCertification> Certifications { get; set; } = new();
+        public List<CvResolvedEducationDto> Education { get; set; } = new();
+        public List<CvResolvedExperienceDto> Experience { get; set; } = new();
+        public List<CvResolvedCertificationDto> Certifications { get; set; } = new();
         public List<string> Skills { get; set; } = new();
+        public List<CvResolvedLanguageDto> Languages { get; set; } = new();
+        public List<CvResolvedProjectDto> Projects { get; set; } = new();
     }
 
     public interface ICvPdfRenderer

@@ -35,6 +35,6 @@ namespace IRAS.Domain.Enums
     public enum ChatSender { User, Bot }
     public enum KnowledgeCategory { FAQ, PolicyGuideline, SkillAdvice, PlatformHowTo }
 
-    public enum CvSectionType { Summary, Skills, Experience, Education, Certifications }
-    public enum CvReferenceType { Education, Experience, Certification, Skill }
+    public enum CvSectionType { Summary, Skills, Experience, Education, Certifications, Languages, Projects }
+    public enum CvReferenceType { Education, Experience, Certification, Skill, Language, Project }
 }

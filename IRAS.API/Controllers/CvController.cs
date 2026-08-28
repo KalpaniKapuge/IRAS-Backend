@@ -39,6 +39,15 @@ namespace IRAS.API.Controllers
             return NoContent();
         }
 
+        [HttpPost("{cvId:int}/photo")]
+        [Consumes("multipart/form-data")]
+        public async Task<IActionResult> UploadPhoto(int cvId, CancellationToken ct)
+        {
+            var file = Request.Form.Files.GetFile("file") ?? Request.Form.Files.GetFile("photo");
+            if (file == null) return BadRequest(new { message = "CV photo file is required." });
+            return Ok(await _service.UploadCvPhotoAsync(User.GetUserId(), cvId, file, ct));
+        }
+
         [HttpPut("{cvId:int}/items")]
         public async Task<IActionResult> UpdateItems(int cvId, UpdateCvSectionItemsRequest request, CancellationToken ct)
         {

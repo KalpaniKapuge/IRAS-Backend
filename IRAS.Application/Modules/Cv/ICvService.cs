@@ -1,4 +1,5 @@
 // IRAS.Application/Modules/Cv/ICvService.cs
+using Microsoft.AspNetCore.Http;
 using IRAS.Application.Modules.Cv.DTOs;
 
 namespace IRAS.Application.Modules.Cv
@@ -14,6 +15,8 @@ namespace IRAS.Application.Modules.Cv
         Task<CvDetailDto> CreateCvAsync(int candidateId, CreateCvRequest request, CancellationToken ct);
 
         Task UpdateCvAsync(int candidateId, int cvId, UpdateCvRequest request, CancellationToken ct);
+
+        Task<CvDetailDto> UploadCvPhotoAsync(int candidateId, int cvId, IFormFile file, CancellationToken ct);
 
         Task UpdateSectionItemsAsync(int candidateId, int cvId, UpdateCvSectionItemsRequest request, CancellationToken ct);
 

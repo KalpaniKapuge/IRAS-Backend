@@ -12,6 +12,7 @@ namespace IRAS.Domain.Entities.Candidate
         public string Title { get; set; } = null!;
         public string TemplateName { get; set; } = null!;   // "Classic" | "Modern" | "Compact"
         public string? Summary { get; set; }
+        public string? PhotoUrl { get; set; }
 
         // Comma-separated CvSectionType names in display order — a section type omitted
         // here is excluded from this CV entirely. Kept as a simple ordered string rather
