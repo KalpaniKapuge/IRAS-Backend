@@ -26,6 +26,10 @@ namespace IRAS.API.Controllers
         public async Task<IActionResult> Upload(IFormFile file, CancellationToken ct)
             => Ok(await _service.UploadAndParseAsync(User.GetUserId(), file, ct));
 
+        [HttpPost("from-cv/{cvId:int}")]
+        public async Task<IActionResult> CreateFromCv(int cvId, CancellationToken ct)
+            => Ok(await _service.CreateFromCvAsync(User.GetUserId(), cvId, ct));
+
         [HttpPost("{resumeId:int}/retry-parse")]
         public async Task<IActionResult> RetryParse(int resumeId, CancellationToken ct)
             => Ok(await _service.RetryParseAsync(User.GetUserId(), resumeId, ct));

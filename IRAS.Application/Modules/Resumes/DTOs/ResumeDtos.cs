@@ -11,6 +11,11 @@ namespace IRAS.Application.Modules.Resumes.DTOs
         public string ParseStatus { get; set; } = null!;
         public string? ParseError { get; set; }
         public DateTime UploadedAt { get; set; }
+
+        // Non-null only when this resume was generated from a CV-builder CV — lets the UI
+        // show "My Software Engineer CV" instead of a generic "PDF Resume" label. Null both
+        // when it was a direct upload and when the source CV was since deleted.
+        public string? SourceCvTitle { get; set; }
     }
 
     public class ParseResultDto

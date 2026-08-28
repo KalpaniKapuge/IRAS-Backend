@@ -15,6 +15,14 @@ namespace IRAS.Domain.Entities.Candidate
         public string? ParseError { get; set; }              // correction #7
         public DateTime UploadedAt { get; set; } = DateTime.UtcNow;
 
+        // Set when this resume was generated from a CV-builder CvDocument rather than
+        // uploaded directly — lets the UI label it with the CV's own title instead of a
+        // generic "PDF Resume", and distinguishes its provenance from an uploaded file.
+        // Nullable and SetNull-on-delete: deleting the source CV should never delete a
+        // resume that's already been used on a live Application.
+        public int? SourceCvId { get; set; }
+        public CvDocument? SourceCv { get; set; }
+
         public CandidateProfile Candidate { get; set; } = null!;
     }
 }

@@ -230,6 +230,15 @@ namespace IRAS.Application.Modules.Cv
         public async Task DeleteCvAsync(int candidateId, int cvId, CancellationToken ct)
         {
             var cv = await GetOwnedCvAsync(candidateId, cvId, ct);
+
+            // Resumes.SourceCvId can't use a DB-level ON DELETE SET NULL (SQL Server rejects
+            // it here — multiple cascade paths through CandidateProfiles), so any resume
+            // generated from this CV is unlinked explicitly before the CV itself is removed.
+            // The resume (and its already-rendered PDF/ParsedText) stays fully usable — it
+            // just stops being labeled with this CV's title once the CV is gone.
+            var linkedResumes = await _db.Resumes.Where(r => r.SourceCvId == cvId).ToListAsync(ct);
+            foreach (var resume in linkedResumes) resume.SourceCvId = null;
+
             _db.CvDocuments.Remove(cv); // cascades CvSectionItem rows
             await _db.SaveChangesAsync(ct);
         }

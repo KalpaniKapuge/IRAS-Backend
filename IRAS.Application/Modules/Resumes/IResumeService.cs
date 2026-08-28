@@ -8,6 +8,7 @@ namespace IRAS.Application.Modules.Resumes
     {
         Task<List<ResumeDto>> GetMyResumesAsync(int candidateId, CancellationToken ct);
         Task<ParseResultDto> UploadAndParseAsync(int candidateId, IFormFile file, CancellationToken ct);
+        Task<ParseResultDto> CreateFromCvAsync(int candidateId, int cvId, CancellationToken ct);
         Task<ParseResultDto> RetryParseAsync(int candidateId, int resumeId, CancellationToken ct);
         Task ConfirmSkillsAsync(int candidateId, int resumeId, ConfirmSkillsRequest request, CancellationToken ct);
         Task SetPrimaryAsync(int candidateId, int resumeId, CancellationToken ct);

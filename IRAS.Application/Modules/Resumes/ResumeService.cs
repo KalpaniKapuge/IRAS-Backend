@@ -6,6 +6,8 @@ using Microsoft.Extensions.Options;
 using IRAS.Application.Common.Ai;
 using IRAS.Application.Common.Options;
 using IRAS.Application.Common.Storage;
+using IRAS.Application.Modules.Cv;
+using IRAS.Application.Modules.Cv.DTOs;
 using IRAS.Application.Modules.Resumes.DTOs;
 using IRAS.Domain.Entities.Candidate;
 using IRAS.Domain.Entities.Skills;
@@ -23,16 +25,18 @@ namespace IRAS.Application.Modules.Resumes
         private readonly IrasDbContext _db;
         private readonly IFileStorage _storage;
         private readonly IAiServiceClient _ai;
+        private readonly ICvService _cv;
         private readonly FileStorageOptions _options;
         private readonly ILogger<ResumeService> _logger;
 
         public ResumeService(
-            IrasDbContext db, IFileStorage storage, IAiServiceClient ai,
+            IrasDbContext db, IFileStorage storage, IAiServiceClient ai, ICvService cv,
             IOptions<FileStorageOptions> options, ILogger<ResumeService> logger)
         {
             _db = db;
             _storage = storage;
             _ai = ai;
+            _cv = cv;
             _options = options.Value;
             _logger = logger;
         }
@@ -49,7 +53,8 @@ namespace IRAS.Application.Modules.Resumes
                     IsPrimary = r.IsPrimary,
                     ParseStatus = r.ParseStatus.ToString(),
                     ParseError = r.ParseError,
-                    UploadedAt = r.UploadedAt
+                    UploadedAt = r.UploadedAt,
+                    SourceCvTitle = r.SourceCv != null ? r.SourceCv.Title : null
                 })
                 .ToListAsync(ct);
         }
@@ -87,6 +92,88 @@ namespace IRAS.Application.Modules.Resumes
 
             // 2. Parse (state transitions handled inside)
             return await ParseAndPersistAsync(resume, ct);
+        }
+
+        // Generates a resume from an existing CV-builder CV instead of an uploaded file.
+        // Bypasses the AI parser entirely: the CV's structured content already comes straight
+        // from the candidate's confirmed CandidateSkills/Educations/WorkExperiences, so the
+        // AI parser's own skill-detection would just be re-deriving data that's already known
+        // and already correct. ParsedText is instead built directly from that same resolved
+        // content, and only needs to be coherent, information-dense prose — it feeds the
+        // matching service's semantic-similarity embedding, which works on arbitrary text, not
+        // specifically parser output. ParseStatus goes straight to Parsed since there is
+        // nothing left to confirm: the CV's skills already equal the candidate's confirmed
+        // CandidateSkills rows (see CvService.ResolveContent), so a skill-confirmation pass
+        // would be a no-op.
+        public async Task<ParseResultDto> CreateFromCvAsync(int candidateId, int cvId, CancellationToken ct)
+        {
+            var resumeCount = await _db.Resumes.CountAsync(r => r.CandidateId == candidateId, ct);
+            if (resumeCount >= _options.MaxResumesPerCandidate)
+                throw new InvalidOperationException(
+                    $"Maximum of {_options.MaxResumesPerCandidate} resumes reached. Delete one first.");
+
+            var cv = await _cv.GetCvDetailAsync(candidateId, cvId, ct);       // 404s if not owned
+            var pdfBytes = await _cv.RenderPdfAsync(candidateId, cvId, ct);
+
+            var storedName = $"{Guid.NewGuid():N}.pdf";
+            string storedPath;
+            await using (var stream = new MemoryStream(pdfBytes))
+            {
+                storedPath = await _storage.SaveAsync(stream, candidateId.ToString(), storedName, ct);
+            }
+
+            var resume = new Resume
+            {
+                CandidateId = candidateId,
+                FileUrl = storedPath,
+                FileFormat = ResumeFormat.PDF,
+                IsPrimary = resumeCount == 0,
+                ParsedText = BuildParsedTextFromCv(cv),
+                ParseStatus = ParseStatus.Parsed,
+                SourceCvId = cvId
+            };
+            _db.Resumes.Add(resume);
+            await _db.SaveChangesAsync(ct);
+
+            return new ParseResultDto { ResumeId = resume.ResumeId, ParseStatus = resume.ParseStatus.ToString() };
+        }
+
+        private static string BuildParsedTextFromCv(CvDetailDto cv)
+        {
+            var parts = new List<string> { cv.FullName };
+            if (!string.IsNullOrWhiteSpace(cv.Headline)) parts.Add(cv.Headline);
+            if (!string.IsNullOrWhiteSpace(cv.Summary)) parts.Add(cv.Summary);
+
+            if (cv.ResolvedSkills.Count > 0)
+                parts.Add("Skills: " + string.Join(", ", cv.ResolvedSkills));
+
+            foreach (var e in cv.ResolvedExperience)
+            {
+                var line = $"{e.JobTitle} at {e.CompanyName}.";
+                if (!string.IsNullOrWhiteSpace(e.Description)) line += " " + e.Description;
+                parts.Add(line);
+            }
+
+            foreach (var e in cv.ResolvedEducation)
+            {
+                var field = string.IsNullOrWhiteSpace(e.FieldOfStudy) ? "" : $" in {e.FieldOfStudy}";
+                parts.Add($"{e.Degree}{field}, {e.Institution}.");
+            }
+
+            foreach (var c in cv.ResolvedCertifications)
+                parts.Add(string.IsNullOrWhiteSpace(c.IssuingOrg) ? c.Name : $"{c.Name} — {c.IssuingOrg}.");
+
+            foreach (var p in cv.ResolvedProjects)
+            {
+                var line = p.Title + ".";
+                if (!string.IsNullOrWhiteSpace(p.Description)) line += " " + p.Description;
+                parts.Add(line);
+            }
+
+            if (cv.ResolvedLanguages.Count > 0)
+                parts.Add("Languages: " + string.Join(", ", cv.ResolvedLanguages.Select(l => $"{l.LanguageName} ({l.Proficiency})")));
+
+            return string.Join("\n\n", parts);
         }
 
         public async Task<ParseResultDto> RetryParseAsync(int candidateId, int resumeId, CancellationToken ct)
