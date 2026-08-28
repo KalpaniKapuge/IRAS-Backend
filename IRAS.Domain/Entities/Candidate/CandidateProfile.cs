@@ -30,5 +30,6 @@ namespace IRAS.Domain.Entities.Candidate
         public ICollection<CandidateProject> Projects { get; set; } = new List<CandidateProject>();
         public ICollection<CandidateSkill> CandidateSkills { get; set; } = new List<CandidateSkill>();
         public ICollection<CandidateTargetSkill> TargetSkills { get; set; } = new List<CandidateTargetSkill>();
+        public ICollection<SkillImprovementPlan> ImprovementPlans { get; set; } = new List<SkillImprovementPlan>();
     }
 }

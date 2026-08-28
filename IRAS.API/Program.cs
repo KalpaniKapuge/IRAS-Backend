@@ -29,6 +29,7 @@ using IRAS.Application.Modules.Matching;
 using IRAS.Application.Modules.Resumes;
 using IRAS.Application.Modules.SkillDevelopment;
 using IRAS.Application.Modules.SkillGaps;
+using IRAS.Application.Modules.SkillImprovementPlans;
 using IRAS.Application.Modules.SkillTaxonomy;
 using IRAS.Infrastructure.Data;
 
@@ -150,8 +151,17 @@ builder.Services.AddScoped<IJobMatchingService, JobMatchingService>();
 
 builder.Services.AddScoped<ISkillGapService, SkillGapService>();
 builder.Services.AddScoped<ISkillDevelopmentService, SkillDevelopmentService>();
+builder.Services.AddScoped<ISkillImprovementPlanService, SkillImprovementPlanService>();
 
 builder.Services.AddHttpClient<ISkillGapExplainer, GeminiSkillGapExplainer>((sp, client) =>
+{
+    var opts = builder.Configuration.GetSection(GeminiOptions.SectionName).Get<GeminiOptions>()
+        ?? new GeminiOptions();
+    client.BaseAddress = new Uri(opts.BaseUrl);
+    client.Timeout = TimeSpan.FromSeconds(60);
+});
+
+builder.Services.AddHttpClient<ISkillPlanGenerator, GeminiSkillPlanGenerator>((sp, client) =>
 {
     var opts = builder.Configuration.GetSection(GeminiOptions.SectionName).Get<GeminiOptions>()
         ?? new GeminiOptions();

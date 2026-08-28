@@ -15,6 +15,10 @@ namespace IRAS.Domain.Enums
     public enum SkillResourceType { Course, Tutorial, Project, Documentation }
     public enum TargetSkillStatus { Learning, Completed }
 
+    public enum SkillPlanPriority { High, Medium, Low }
+    public enum SkillTargetLevel { Beginner, Intermediate, JobReady }
+    public enum SkillPlanStatus { NotStarted, Learning, Practicing, Completed, Verified }
+
     public enum ImportanceLevel { MustHave, NiceToHave }
     public enum EmploymentType { FullTime, PartTime, Contract, Internship, Remote }
     public enum JobStatus { Draft, Published, Closed, Archived }

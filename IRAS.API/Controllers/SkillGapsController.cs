@@ -5,6 +5,8 @@ using IRAS.API.Extensions;
 using IRAS.Application.Modules.SkillGaps;
 using IRAS.Application.Modules.SkillDevelopment;
 using IRAS.Application.Modules.SkillDevelopment.DTOs;
+using IRAS.Application.Modules.SkillImprovementPlans;
+using IRAS.Application.Modules.SkillImprovementPlans.DTOs;
 
 namespace IRAS.API.Controllers
 {
@@ -14,6 +16,10 @@ namespace IRAS.API.Controllers
     //
     // target-skills/* closes the loop after that: lets the candidate mark a gap as
     // "working on it" and track it through to completion (see SkillDevelopmentService).
+    //
+    // generate-plan closes it further: produces a full A-Z learning roadmap for one gap
+    // (see SkillImprovementPlanService) — the rest of that plan's lifecycle (steps, detail)
+    // lives on SkillImprovementPlansController since a plan outlives the gap it came from.
     [ApiController]
     [Route("api/candidates/{candidateId:int}/skill-gaps")]
     [Authorize]
@@ -21,10 +27,13 @@ namespace IRAS.API.Controllers
     {
         private readonly ISkillGapService _service;
         private readonly ISkillDevelopmentService _development;
-        public SkillGapsController(ISkillGapService service, ISkillDevelopmentService development)
+        private readonly ISkillImprovementPlanService _plans;
+        public SkillGapsController(
+            ISkillGapService service, ISkillDevelopmentService development, ISkillImprovementPlanService plans)
         {
             _service = service;
             _development = development;
+            _plans = plans;
         }
 
         private IActionResult? CheckAccess(int candidateId)
@@ -77,6 +86,14 @@ namespace IRAS.API.Controllers
             var deny = CheckAccess(candidateId); if (deny != null) return deny;
             await _development.RemoveTargetSkillAsync(candidateId, skillId, ct);
             return NoContent();
+        }
+
+        [HttpPost("{skillId:int}/generate-plan")]
+        public async Task<IActionResult> GeneratePlan(
+            int candidateId, int skillId, [FromBody] GeneratePlanRequest? request, CancellationToken ct)
+        {
+            var deny = CheckAccess(candidateId); if (deny != null) return deny;
+            return Ok(await _plans.GeneratePlanAsync(candidateId, skillId, request ?? new GeneratePlanRequest(), ct));
         }
     }
 }

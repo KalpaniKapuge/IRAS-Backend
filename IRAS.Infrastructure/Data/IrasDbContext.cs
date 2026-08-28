@@ -30,6 +30,8 @@ namespace IRAS.Infrastructure.Data
         public DbSet<CandidateSkill> CandidateSkills => Set<CandidateSkill>();
         public DbSet<SkillResource> SkillResources => Set<SkillResource>();
         public DbSet<CandidateTargetSkill> CandidateTargetSkills => Set<CandidateTargetSkill>();
+        public DbSet<SkillImprovementPlan> SkillImprovementPlans => Set<SkillImprovementPlan>();
+        public DbSet<SkillPlanStep> SkillPlanSteps => Set<SkillPlanStep>();
         public DbSet<CvDocument> CvDocuments => Set<CvDocument>();
         public DbSet<CvSectionItem> CvSectionItems => Set<CvSectionItem>();
         public DbSet<Job> Jobs => Set<Job>();
