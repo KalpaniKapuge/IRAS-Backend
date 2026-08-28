@@ -7,6 +7,7 @@ using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
 using Swashbuckle.AspNetCore.SwaggerGen;
+using System.Diagnostics;
 using System.Text;
 using IRAS.API.Filters;
 using IRAS.Application.Common.Audit;
@@ -32,6 +33,19 @@ using IRAS.Application.Modules.SkillTaxonomy;
 using IRAS.Infrastructure.Data;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Dev convenience: a previous `dotnet run` that didn't shut down cleanly (Ctrl+C not
+// waited out, IDE stop, watch-triggered restart racing the old process) leaves
+// IRAS.API.exe holding the Kestrel port, so the next run fails with "address already
+// in use" before it ever reaches app.Run(). That happened often enough during active
+// development that it's worth clearing automatically rather than a manual taskkill each
+// time. Development-only, and this only ever targets a process literally named
+// IRAS.API — never anything else that might be on the port.
+if (builder.Environment.IsDevelopment())
+{
+    FreeStalePort(5048);
+    FreeStalePort(7232);
+}
 
 builder.Services.AddControllers(options => options.Filters.Add<ApiExceptionFilter>());
 builder.Services.AddEndpointsApiExplorer();
@@ -250,6 +264,57 @@ app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
 app.Run();
+
+// See the FreeStalePort(...) calls near the top of this file — Development-only,
+// finds whatever is LISTENING on the given port via `netstat -ano`, and kills it only if
+// that process is literally named IRAS.API. Never touches unrelated processes, and any
+// failure here (netstat missing, permission denied, etc.) is swallowed silently — this is
+// a convenience, not something worth failing startup over.
+static void FreeStalePort(int port)
+{
+    try
+    {
+        using var netstat = Process.Start(new ProcessStartInfo
+        {
+            FileName = "netstat",
+            Arguments = "-ano",
+            RedirectStandardOutput = true,
+            UseShellExecute = false,
+            CreateNoWindow = true
+        });
+        if (netstat is null) return;
+
+        var output = netstat.StandardOutput.ReadToEnd();
+        netstat.WaitForExit(2000);
+
+        var currentPid = Environment.ProcessId;
+        foreach (var line in output.Split('\n'))
+        {
+            if (!line.Contains($":{port} ") || !line.Contains("LISTENING")) continue;
+
+            var parts = line.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length == 0 || !int.TryParse(parts[^1], out var pid) || pid == currentPid) continue;
+
+            try
+            {
+                using var proc = Process.GetProcessById(pid);
+                if (!proc.ProcessName.Equals("IRAS.API", StringComparison.OrdinalIgnoreCase)) continue;
+
+                Console.WriteLine($"[dev] Port {port} was held by a stale IRAS.API.exe (PID {pid}) — stopping it.");
+                proc.Kill();
+                proc.WaitForExit(2000);
+            }
+            catch
+            {
+                // Already exited, access denied, etc. — Kestrel's own bind error is the fallback if this didn't work.
+            }
+        }
+    }
+    catch
+    {
+        // netstat unavailable or something else went wrong — not worth failing startup over.
+    }
+}
 
 // Only requires the operation to carry the Bearer padlock in Swagger when the endpoint
 // is actually protected by [Authorize] (and not opted back out via [AllowAnonymous]).
