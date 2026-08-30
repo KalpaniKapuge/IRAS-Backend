@@ -152,6 +152,7 @@ builder.Services.AddScoped<IJobMatchingService, JobMatchingService>();
 builder.Services.AddScoped<ISkillGapService, SkillGapService>();
 builder.Services.AddScoped<ISkillDevelopmentService, SkillDevelopmentService>();
 builder.Services.AddScoped<ISkillImprovementPlanService, SkillImprovementPlanService>();
+builder.Services.AddScoped<ISkillPlanEvidenceService, SkillPlanEvidenceService>();
 
 builder.Services.AddHttpClient<ISkillGapExplainer, GeminiSkillGapExplainer>((sp, client) =>
 {

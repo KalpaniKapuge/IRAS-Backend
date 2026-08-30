@@ -16,7 +16,12 @@ namespace IRAS.API.Controllers
     public class SkillImprovementPlansController : ControllerBase
     {
         private readonly ISkillImprovementPlanService _service;
-        public SkillImprovementPlansController(ISkillImprovementPlanService service) => _service = service;
+        private readonly ISkillPlanEvidenceService _evidence;
+        public SkillImprovementPlansController(ISkillImprovementPlanService service, ISkillPlanEvidenceService evidence)
+        {
+            _service = service;
+            _evidence = evidence;
+        }
 
         private IActionResult? CheckAccess(int candidateId)
         {
@@ -46,6 +51,39 @@ namespace IRAS.API.Controllers
         {
             var deny = CheckAccess(candidateId); if (deny != null) return deny;
             return Ok(await _service.SetStepCompletionAsync(candidateId, planId, stepId, request.IsCompleted, ct));
+        }
+
+        // Two actions sharing one route, disambiguated at runtime by [Consumes] — same
+        // pattern as CandidateProfileController's certification upload. The Swagger
+        // conflict this causes is already resolved globally in Program.cs
+        // (options.ResolveConflictingActions).
+        [HttpPost("{planId:int}/evidence")]
+        [Consumes("application/json")]
+        public async Task<IActionResult> AddEvidenceLink(
+            int candidateId, int planId, AddEvidenceLinkRequest request, CancellationToken ct)
+        {
+            var deny = CheckAccess(candidateId); if (deny != null) return deny;
+            return Ok(await _evidence.AddEvidenceLinkAsync(candidateId, planId, request, ct));
+        }
+
+        [HttpPost("{planId:int}/evidence")]
+        [Consumes("multipart/form-data")]
+        public async Task<IActionResult> AddEvidenceFile(
+            int candidateId, int planId, [FromForm] AddEvidenceFileRequest request, CancellationToken ct)
+        {
+            var deny = CheckAccess(candidateId); if (deny != null) return deny;
+
+            request.File ??= Request.Form.Files.GetFile("file") ?? Request.Form.Files.FirstOrDefault();
+
+            return Ok(await _evidence.AddEvidenceFileAsync(candidateId, planId, request, ct));
+        }
+
+        [HttpDelete("{planId:int}/evidence/{evidenceId:int}")]
+        public async Task<IActionResult> RemoveEvidence(int candidateId, int planId, int evidenceId, CancellationToken ct)
+        {
+            var deny = CheckAccess(candidateId); if (deny != null) return deny;
+            await _evidence.RemoveEvidenceAsync(candidateId, planId, evidenceId, ct);
+            return NoContent();
         }
     }
 }

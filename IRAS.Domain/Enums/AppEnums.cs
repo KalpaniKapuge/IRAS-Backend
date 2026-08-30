@@ -19,6 +19,9 @@ namespace IRAS.Domain.Enums
     public enum SkillTargetLevel { Beginner, Intermediate, JobReady }
     public enum SkillPlanStatus { NotStarted, Learning, Practicing, Completed, Verified }
 
+    public enum SkillEvidenceType { GitHub, File, Screenshot, Certificate, Other }
+    public enum EvidenceVerificationStatus { Pending, Approved, Rejected }
+
     public enum ImportanceLevel { MustHave, NiceToHave }
     public enum EmploymentType { FullTime, PartTime, Contract, Internship, Remote }
     public enum JobStatus { Draft, Published, Closed, Archived }

@@ -39,5 +39,6 @@ namespace IRAS.Domain.Entities.Skills
         public Skill Skill { get; set; } = null!;
         public Job? Job { get; set; }
         public ICollection<SkillPlanStep> Steps { get; set; } = new List<SkillPlanStep>();
+        public ICollection<SkillPlanEvidence> Evidence { get; set; } = new List<SkillPlanEvidence>();
     }
 }

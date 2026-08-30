@@ -24,6 +24,7 @@ namespace IRAS.Application.Modules.SkillImprovementPlans
                 .Include(p => p.Skill)
                 .Include(p => p.Job)
                 .Include(p => p.Steps)
+                .Include(p => p.Evidence)
                 .Where(p => p.CandidateId == candidateId)
                 .OrderByDescending(p => p.CreatedAt)
                 .ToListAsync(ct);
@@ -42,7 +43,7 @@ namespace IRAS.Application.Modules.SkillImprovementPlans
         {
             // Idempotent: regenerating loses no candidate progress and costs nothing extra.
             var existing = await _db.SkillImprovementPlans
-                .Include(p => p.Skill).Include(p => p.Job).Include(p => p.Steps)
+                .Include(p => p.Skill).Include(p => p.Job).Include(p => p.Steps).Include(p => p.Evidence)
                 .FirstOrDefaultAsync(p => p.CandidateId == candidateId && p.SkillId == skillId, ct);
             if (existing != null)
                 return MapToDto(existing);
@@ -128,13 +129,14 @@ namespace IRAS.Application.Modules.SkillImprovementPlans
         private async Task<SkillImprovementPlan> LoadOwnedPlanAsync(int candidateId, int planId, CancellationToken ct)
         {
             return await _db.SkillImprovementPlans
-                .Include(p => p.Skill).Include(p => p.Job).Include(p => p.Steps)
+                .Include(p => p.Skill).Include(p => p.Job).Include(p => p.Steps).Include(p => p.Evidence)
                 .FirstOrDefaultAsync(p => p.PlanId == planId && p.CandidateId == candidateId, ct)
                 ?? throw new KeyNotFoundException("Skill improvement plan not found.");
         }
 
         // NotStarted -> Learning -> Practicing -> Completed, driven purely by step-completion
-        // ratio. Verified is deliberately never set here — that's an admin action (Phase 2).
+        // ratio. Verified is deliberately never set here — only SkillPlanEvidenceService
+        // .VerifyEvidenceAsync promotes to Verified, and only once this ratio is already 1.0.
         private static SkillPlanStatus ComputeStatus(ICollection<SkillPlanStep> steps)
         {
             if (steps.Count == 0) return SkillPlanStatus.NotStarted;
@@ -183,7 +185,21 @@ namespace IRAS.Application.Modules.SkillImprovementPlans
                     Output = s.Output,
                     IsCompleted = s.IsCompleted,
                     CompletedAt = s.CompletedAt
-                }).ToList()
+                }).ToList(),
+                Evidence = p.Evidence
+                    .OrderByDescending(e => e.UploadedAt)
+                    .Select(e => new SkillPlanEvidenceDto
+                    {
+                        EvidenceId = e.EvidenceId,
+                        PlanId = e.PlanId,
+                        EvidenceType = e.EvidenceType.ToString(),
+                        EvidenceUrl = e.EvidenceUrl,
+                        Notes = e.Notes,
+                        UploadedAt = e.UploadedAt,
+                        VerificationStatus = e.VerificationStatus.ToString(),
+                        VerifiedAt = e.VerifiedAt,
+                        VerifierNotes = e.VerifierNotes
+                    }).ToList()
             };
         }
     }
