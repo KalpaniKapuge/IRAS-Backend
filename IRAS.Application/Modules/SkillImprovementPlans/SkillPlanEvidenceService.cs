@@ -1,6 +1,8 @@
 // IRAS.Application/Modules/SkillImprovementPlans/SkillPlanEvidenceService.cs
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
+using IRAS.Application.Common.Options;
 using IRAS.Application.Common.Storage;
 using IRAS.Application.Modules.SkillImprovementPlans.DTOs;
 using IRAS.Domain.Entities.Skills;
@@ -31,25 +33,64 @@ namespace IRAS.Application.Modules.SkillImprovementPlans
 
         private readonly IrasDbContext _db;
         private readonly IFileStorage _storage;
+        private readonly IEvidenceReviewer _reviewer;
+        private readonly EvidenceReviewOptions _reviewOptions;
 
-        public SkillPlanEvidenceService(IrasDbContext db, IFileStorage storage)
+        public SkillPlanEvidenceService(
+            IrasDbContext db, IFileStorage storage, IEvidenceReviewer reviewer, IOptions<EvidenceReviewOptions> reviewOptions)
         {
             _db = db;
             _storage = storage;
+            _reviewer = reviewer;
+            _reviewOptions = reviewOptions.Value;
         }
 
         public async Task<SkillPlanEvidenceDto> AddEvidenceLinkAsync(
             int candidateId, int planId, AddEvidenceLinkRequest request, CancellationToken ct)
         {
-            await EnsurePlanOwnedAsync(candidateId, planId, ct);
+            var plan = await _db.SkillImprovementPlans
+                .Include(p => p.Skill).Include(p => p.Steps)
+                .FirstOrDefaultAsync(p => p.PlanId == planId && p.CandidateId == candidateId, ct)
+                ?? throw new KeyNotFoundException("Skill improvement plan not found.");
+
+            var evidenceType = ParseEnum<SkillEvidenceType>(request.EvidenceType, nameof(request.EvidenceType));
+            var evidenceUrl = request.EvidenceUrl.Trim();
+            var notes = string.IsNullOrWhiteSpace(request.Notes) ? null : request.Notes.Trim();
 
             var evidence = new SkillPlanEvidence
             {
                 PlanId = planId,
-                EvidenceType = ParseEnum<SkillEvidenceType>(request.EvidenceType, nameof(request.EvidenceType)),
-                EvidenceUrl = request.EvidenceUrl.Trim(),
-                Notes = string.IsNullOrWhiteSpace(request.Notes) ? null : request.Notes.Trim()
+                EvidenceType = evidenceType,
+                EvidenceUrl = evidenceUrl,
+                Notes = notes
             };
+
+            // Automatic triage — link-type evidence only (see IEvidenceReviewer for why
+            // file-backed types skip this and always land in the admin queue).
+            var review = await _reviewer.ReviewAsync(
+                plan.Skill.SkillName, plan.ProjectTitle, plan.ProjectTask, plan.ProjectExpectedOutput,
+                evidenceType.ToString(), evidenceUrl, notes, ct);
+
+            evidence.AiConfidenceScore = review.ConfidenceScore;
+            evidence.AiRationale = review.Rationale;
+
+            if (review.ConfidenceScore >= _reviewOptions.AutoApproveThreshold)
+            {
+                evidence.VerificationStatus = EvidenceVerificationStatus.Approved;
+                evidence.VerifiedAt = DateTime.UtcNow;
+                evidence.AutoReviewed = true;
+
+                if (plan.Steps.Count > 0 && plan.Steps.All(s => s.IsCompleted))
+                    plan.Status = SkillPlanStatus.Verified;
+            }
+            else if (review.ConfidenceScore <= _reviewOptions.AutoRejectThreshold)
+            {
+                evidence.VerificationStatus = EvidenceVerificationStatus.Rejected;
+                evidence.VerifiedAt = DateTime.UtcNow;
+                evidence.AutoReviewed = true;
+            }
+            // else: stays Pending — the genuinely ambiguous middle band still reaches a human.
+
             _db.SkillPlanEvidence.Add(evidence);
             await _db.SaveChangesAsync(ct);
             return MapToDto(evidence);
@@ -118,7 +159,9 @@ namespace IRAS.Application.Modules.SkillImprovementPlans
                     EvidenceUrl = e.EvidenceUrl,
                     Notes = e.Notes,
                     UploadedAt = e.UploadedAt,
-                    VerificationStatus = e.VerificationStatus.ToString()
+                    VerificationStatus = e.VerificationStatus.ToString(),
+                    AiConfidenceScore = e.AiConfidenceScore,
+                    AiRationale = e.AiRationale
                 })
                 .ToListAsync(ct);
         }
@@ -188,7 +231,10 @@ namespace IRAS.Application.Modules.SkillImprovementPlans
             UploadedAt = e.UploadedAt,
             VerificationStatus = e.VerificationStatus.ToString(),
             VerifiedAt = e.VerifiedAt,
-            VerifierNotes = e.VerifierNotes
+            VerifierNotes = e.VerifierNotes,
+            AiConfidenceScore = e.AiConfidenceScore,
+            AiRationale = e.AiRationale,
+            AutoReviewed = e.AutoReviewed
         };
     }
 }

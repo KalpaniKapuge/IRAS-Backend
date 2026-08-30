@@ -154,6 +154,16 @@ builder.Services.AddScoped<ISkillDevelopmentService, SkillDevelopmentService>();
 builder.Services.AddScoped<ISkillImprovementPlanService, SkillImprovementPlanService>();
 builder.Services.AddScoped<ISkillPlanEvidenceService, SkillPlanEvidenceService>();
 
+builder.Services.Configure<EvidenceReviewOptions>(
+    builder.Configuration.GetSection(EvidenceReviewOptions.SectionName));
+builder.Services.AddHttpClient<IEvidenceReviewer, GeminiEvidenceReviewer>((sp, client) =>
+{
+    var opts = builder.Configuration.GetSection(GeminiOptions.SectionName).Get<GeminiOptions>()
+        ?? new GeminiOptions();
+    client.BaseAddress = new Uri(opts.BaseUrl);
+    client.Timeout = TimeSpan.FromSeconds(60);
+});
+
 builder.Services.AddHttpClient<ISkillGapExplainer, GeminiSkillGapExplainer>((sp, client) =>
 {
     var opts = builder.Configuration.GetSection(GeminiOptions.SectionName).Get<GeminiOptions>()

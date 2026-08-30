@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("IRAS.Domain")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+04566bce0c6d44cb2ac4edae9ccb6333d9b33d21")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+eca0ef93011d87ebda81d79f7e5b7cfd14733fb7")]
 [assembly: System.Reflection.AssemblyProductAttribute("IRAS.Domain")]
 [assembly: System.Reflection.AssemblyTitleAttribute("IRAS.Domain")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

@@ -71,6 +71,11 @@ namespace IRAS.Application.Modules.SkillImprovementPlans.DTOs
         public string VerificationStatus { get; set; } = null!;
         public DateTime? VerifiedAt { get; set; }
         public string? VerifierNotes { get; set; }
+
+        // Null for file-backed evidence (no automatic review — see IEvidenceReviewer).
+        public int? AiConfidenceScore { get; set; }
+        public string? AiRationale { get; set; }
+        public bool AutoReviewed { get; set; }
     }
 
     // For GitHub links or any other external URL — no file involved.
@@ -123,5 +128,7 @@ namespace IRAS.Application.Modules.SkillImprovementPlans.DTOs
         public string? Notes { get; set; }
         public DateTime UploadedAt { get; set; }
         public string VerificationStatus { get; set; } = null!;
+        public int? AiConfidenceScore { get; set; }
+        public string? AiRationale { get; set; }
     }
 }
