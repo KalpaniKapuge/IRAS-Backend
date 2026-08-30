@@ -53,48 +53,16 @@ namespace IRAS.Application.Modules.SkillImprovementPlans
         public async Task<SkillPlanEvidenceDto> AddEvidenceLinkAsync(
             int candidateId, int planId, AddEvidenceLinkRequest request, CancellationToken ct)
         {
-            var plan = await _db.SkillImprovementPlans
-                .Include(p => p.Skill).Include(p => p.Steps)
-                .FirstOrDefaultAsync(p => p.PlanId == planId && p.CandidateId == candidateId, ct)
-                ?? throw new KeyNotFoundException("Skill improvement plan not found.");
-
-            var evidenceType = ParseEnum<SkillEvidenceType>(request.EvidenceType, nameof(request.EvidenceType));
-            var evidenceUrl = request.EvidenceUrl.Trim();
-            var notes = string.IsNullOrWhiteSpace(request.Notes) ? null : request.Notes.Trim();
+            await EnsurePlanOwnedAsync(candidateId, planId, ct);
 
             var evidence = new SkillPlanEvidence
             {
                 PlanId = planId,
-                EvidenceType = evidenceType,
-                EvidenceUrl = evidenceUrl,
-                Notes = notes
+                EvidenceType = ParseEnum<SkillEvidenceType>(request.EvidenceType, nameof(request.EvidenceType)),
+                EvidenceUrl = request.EvidenceUrl.Trim(),
+                Notes = string.IsNullOrWhiteSpace(request.Notes) ? null : request.Notes.Trim(),
+                VerificationStatus = EvidenceVerificationStatus.Draft
             };
-
-            // Automatic triage — link-type evidence only (see IEvidenceReviewer for why
-            // file-backed types skip this and always land in the admin queue).
-            var review = await _reviewer.ReviewAsync(
-                plan.Skill.SkillName, plan.ProjectTitle, plan.ProjectTask, plan.ProjectExpectedOutput,
-                evidenceType.ToString(), evidenceUrl, notes, ct);
-
-            evidence.AiConfidenceScore = review.ConfidenceScore;
-            evidence.AiRationale = review.Rationale;
-
-            if (review.ConfidenceScore >= _reviewOptions.AutoApproveThreshold)
-            {
-                evidence.VerificationStatus = EvidenceVerificationStatus.Approved;
-                evidence.VerifiedAt = DateTime.UtcNow;
-                evidence.AutoReviewed = true;
-
-                if (plan.Steps.Count > 0 && plan.Steps.All(s => s.IsCompleted))
-                    await PromoteToVerifiedAsync(plan, ct);
-            }
-            else if (review.ConfidenceScore <= _reviewOptions.AutoRejectThreshold)
-            {
-                evidence.VerificationStatus = EvidenceVerificationStatus.Rejected;
-                evidence.VerifiedAt = DateTime.UtcNow;
-                evidence.AutoReviewed = true;
-            }
-            // else: stays Pending — the genuinely ambiguous middle band still reaches a human.
 
             _db.SkillPlanEvidence.Add(evidence);
             await _db.SaveChangesAsync(ct);
@@ -121,9 +89,65 @@ namespace IRAS.Application.Modules.SkillImprovementPlans
                 PlanId = planId,
                 EvidenceType = ParseEnum<SkillEvidenceType>(request.EvidenceType, nameof(request.EvidenceType)),
                 EvidenceUrl = url,
-                Notes = string.IsNullOrWhiteSpace(request.Notes) ? null : request.Notes.Trim()
+                Notes = string.IsNullOrWhiteSpace(request.Notes) ? null : request.Notes.Trim(),
+                VerificationStatus = EvidenceVerificationStatus.Draft
             };
             _db.SkillPlanEvidence.Add(evidence);
+            await _db.SaveChangesAsync(ct);
+            return MapToDto(evidence);
+        }
+
+        public async Task<SkillPlanEvidenceDto> SubmitEvidenceForReviewAsync(
+            int candidateId, int planId, int evidenceId, CancellationToken ct)
+        {
+            var evidence = await _db.SkillPlanEvidence
+                .Include(e => e.Plan).ThenInclude(p => p.Skill)
+                .Include(e => e.Plan).ThenInclude(p => p.Steps)
+                .FirstOrDefaultAsync(e => e.EvidenceId == evidenceId && e.PlanId == planId
+                    && e.Plan.CandidateId == candidateId, ct)
+                ?? throw new KeyNotFoundException("Evidence not found.");
+
+            if (evidence.VerificationStatus != EvidenceVerificationStatus.Draft)
+                throw new ArgumentException("This evidence has already been submitted for review.");
+
+            if (FileBackedTypes.Contains(evidence.EvidenceType))
+            {
+                // No automatic review capability for files/screenshots (see IEvidenceReviewer)
+                // — submitting always hands it straight to the admin queue.
+                evidence.VerificationStatus = EvidenceVerificationStatus.Pending;
+            }
+            else
+            {
+                var review = await _reviewer.ReviewAsync(
+                    evidence.Plan.Skill.SkillName, evidence.Plan.ProjectTitle, evidence.Plan.ProjectTask,
+                    evidence.Plan.ProjectExpectedOutput, evidence.EvidenceType.ToString(), evidence.EvidenceUrl,
+                    evidence.Notes, ct);
+
+                evidence.AiConfidenceScore = review.ConfidenceScore;
+                evidence.AiRationale = review.Rationale;
+
+                if (review.ConfidenceScore >= _reviewOptions.AutoApproveThreshold)
+                {
+                    evidence.VerificationStatus = EvidenceVerificationStatus.Approved;
+                    evidence.VerifiedAt = DateTime.UtcNow;
+                    evidence.AutoReviewed = true;
+
+                    if (evidence.Plan.Steps.Count > 0 && evidence.Plan.Steps.All(s => s.IsCompleted))
+                        await PromoteToVerifiedAsync(evidence.Plan, ct);
+                }
+                else if (review.ConfidenceScore <= _reviewOptions.AutoRejectThreshold)
+                {
+                    evidence.VerificationStatus = EvidenceVerificationStatus.Rejected;
+                    evidence.VerifiedAt = DateTime.UtcNow;
+                    evidence.AutoReviewed = true;
+                }
+                else
+                {
+                    // Genuinely ambiguous middle band — still reaches a human.
+                    evidence.VerificationStatus = EvidenceVerificationStatus.Pending;
+                }
+            }
+
             await _db.SaveChangesAsync(ct);
             return MapToDto(evidence);
         }
@@ -163,6 +187,10 @@ namespace IRAS.Application.Modules.SkillImprovementPlans
                     SkillId = e.Plan.SkillId,
                     SkillName = e.Plan.Skill.SkillName,
                     JobTitle = e.Plan.Job != null ? e.Plan.Job.Title : null,
+                    PlanOverview = e.Plan.Overview,
+                    ProjectTitle = e.Plan.ProjectTitle,
+                    ProjectTask = e.Plan.ProjectTask,
+                    ProjectExpectedOutput = e.Plan.ProjectExpectedOutput,
                     EvidenceType = e.EvidenceType.ToString(),
                     EvidenceUrl = e.EvidenceUrl,
                     Notes = e.Notes,
@@ -185,6 +213,11 @@ namespace IRAS.Application.Modules.SkillImprovementPlans
                 .Include(e => e.Plan).ThenInclude(p => p.Steps)
                 .FirstOrDefaultAsync(e => e.EvidenceId == evidenceId, ct)
                 ?? throw new KeyNotFoundException("Evidence not found.");
+
+            if (evidence.VerificationStatus != EvidenceVerificationStatus.Pending)
+                throw new ArgumentException(
+                    "Only evidence that is Pending review can be decided on. It may be a Draft the candidate " +
+                    "hasn't submitted yet, or a submission that's already been decided.");
 
             evidence.VerificationStatus = decision switch
             {

@@ -16,5 +16,11 @@ namespace IRAS.Application.Modules.SkillImprovementPlans
 
         Task<SkillImprovementPlanDto> SetStepCompletionAsync(
             int candidateId, int planId, int stepId, bool isCompleted, CancellationToken ct);
+
+        // Candidate's own self-reported progress (NotStarted/Learning/Practicing/
+        // PartiallyCompleted/Completed). Rejects Verified — that's system-only — and rejects
+        // any change once the plan is already Verified.
+        Task<SkillImprovementPlanDto> UpdateProgressAsync(
+            int candidateId, int planId, UpdatePlanProgressRequest request, CancellationToken ct);
     }
 }

@@ -17,10 +17,14 @@ namespace IRAS.Domain.Enums
 
     public enum SkillPlanPriority { High, Medium, Low }
     public enum SkillTargetLevel { Beginner, Intermediate, JobReady }
-    public enum SkillPlanStatus { NotStarted, Learning, Practicing, Completed, Verified }
+    public enum SkillPlanStatus { NotStarted, Learning, Practicing, PartiallyCompleted, Completed, Verified }
 
     public enum SkillEvidenceType { GitHub, File, Screenshot, Certificate, Other }
-    public enum EvidenceVerificationStatus { Pending, Approved, Rejected, RevisionRequired }
+
+    // Draft -> Pending is the candidate's own "Submit for Review" action (see
+    // SkillPlanEvidenceService.SubmitEvidenceForReviewAsync); everything at or past Pending
+    // has left the candidate's hands and is visible to admin/AI review.
+    public enum EvidenceVerificationStatus { Draft, Pending, Approved, Rejected, RevisionRequired }
 
     public enum ImportanceLevel { MustHave, NiceToHave }
     public enum EmploymentType { FullTime, PartTime, Contract, Internship, Remote }

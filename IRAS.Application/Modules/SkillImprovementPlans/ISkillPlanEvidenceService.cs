@@ -11,6 +11,9 @@ namespace IRAS.Application.Modules.SkillImprovementPlans
     // employer-owned lifecycle is large and genuinely independent of moderation).
     public interface ISkillPlanEvidenceService
     {
+        // Evidence starts life as Draft — visible only to the candidate, not yet reviewed.
+        // See SubmitEvidenceForReviewAsync for the "Submit for Review" step that hands it
+        // off to the Pending/AI-triage pipeline.
         Task<SkillPlanEvidenceDto> AddEvidenceLinkAsync(
             int candidateId, int planId, AddEvidenceLinkRequest request, CancellationToken ct);
 
@@ -18,6 +21,12 @@ namespace IRAS.Application.Modules.SkillImprovementPlans
             int candidateId, int planId, AddEvidenceFileRequest request, CancellationToken ct);
 
         Task RemoveEvidenceAsync(int candidateId, int planId, int evidenceId, CancellationToken ct);
+
+        // The candidate's explicit "Submit for Review" action. Only valid on Draft evidence.
+        // Runs the same AI auto-triage (link-type only) and CandidateSkill/CandidateTargetSkill
+        // promotion path that VerifyEvidenceAsync's manual Approve branch uses.
+        Task<SkillPlanEvidenceDto> SubmitEvidenceForReviewAsync(
+            int candidateId, int planId, int evidenceId, CancellationToken ct);
 
         Task<List<AdminEvidenceReviewDto>> GetPendingEvidenceAsync(CancellationToken ct);
 

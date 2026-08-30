@@ -60,6 +60,14 @@ namespace IRAS.Application.Modules.SkillImprovementPlans.DTOs
         public bool IsCompleted { get; set; } = true;
     }
 
+    // The candidate's own self-reported progress — independent of (and never overrides)
+    // Verified, which only SkillPlanEvidenceService can set once evidence is approved.
+    public class UpdatePlanProgressRequest
+    {
+        [Required]
+        public string Status { get; set; } = null!;   // NotStarted | Learning | Practicing | PartiallyCompleted | Completed
+    }
+
     public class SkillPlanEvidenceDto
     {
         public int EvidenceId { get; set; }
@@ -128,6 +136,14 @@ namespace IRAS.Application.Modules.SkillImprovementPlans.DTOs
         public int SkillId { get; set; }
         public string SkillName { get; set; } = null!;
         public string? JobTitle { get; set; }
+
+        // Enough of the roadmap for the admin to judge whether the evidence actually proves
+        // it, without a separate lookup — see the spec's "Improvement plan" review bullet.
+        public string PlanOverview { get; set; } = null!;
+        public string ProjectTitle { get; set; } = null!;
+        public string ProjectTask { get; set; } = null!;
+        public string ProjectExpectedOutput { get; set; } = null!;
+
         public string EvidenceType { get; set; } = null!;
         public string EvidenceUrl { get; set; } = null!;
         public string? Notes { get; set; }

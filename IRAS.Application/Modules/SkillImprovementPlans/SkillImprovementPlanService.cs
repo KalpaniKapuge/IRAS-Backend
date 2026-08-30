@@ -120,7 +120,36 @@ namespace IRAS.Application.Modules.SkillImprovementPlans
             step.IsCompleted = isCompleted;
             step.CompletedAt = isCompleted ? DateTime.UtcNow : null;
 
-            plan.Status = ComputeStatus(plan.Steps);
+            // The checklist only ever nudges progress forward at its two unambiguous
+            // endpoints — starting it, and finishing it 100%. Everything in between
+            // (Learning/Practicing/PartiallyCompleted) is the candidate's own call via
+            // UpdateProgressAsync, so a checkbox toggle never overwrites that self-report.
+            if (plan.Status != SkillPlanStatus.Verified)
+            {
+                if (plan.Steps.Count > 0 && plan.Steps.All(s => s.IsCompleted))
+                    plan.Status = SkillPlanStatus.Completed;
+                else if (plan.Status == SkillPlanStatus.NotStarted && plan.Steps.Any(s => s.IsCompleted))
+                    plan.Status = SkillPlanStatus.Learning;
+            }
+
+            await _db.SaveChangesAsync(ct);
+
+            return MapToDto(plan);
+        }
+
+        public async Task<SkillImprovementPlanDto> UpdateProgressAsync(
+            int candidateId, int planId, UpdatePlanProgressRequest request, CancellationToken ct)
+        {
+            var plan = await LoadOwnedPlanAsync(candidateId, planId, ct);
+
+            if (plan.Status == SkillPlanStatus.Verified)
+                throw new ArgumentException("This skill has already been verified — its progress can no longer be changed.");
+
+            var status = ParseEnum<SkillPlanStatus>(request.Status, nameof(request.Status));
+            if (status == SkillPlanStatus.Verified)
+                throw new ArgumentException("Verified is set automatically once evidence is approved — it can't be set directly.");
+
+            plan.Status = status;
             await _db.SaveChangesAsync(ct);
 
             return MapToDto(plan);
@@ -134,21 +163,12 @@ namespace IRAS.Application.Modules.SkillImprovementPlans
                 ?? throw new KeyNotFoundException("Skill improvement plan not found.");
         }
 
-        // NotStarted -> Learning -> Practicing -> Completed, driven purely by step-completion
-        // ratio. Verified is deliberately never set here — only SkillPlanEvidenceService
-        // .VerifyEvidenceAsync promotes to Verified, and only once this ratio is already 1.0.
-        private static SkillPlanStatus ComputeStatus(ICollection<SkillPlanStep> steps)
+        private static TEnum ParseEnum<TEnum>(string value, string fieldName) where TEnum : struct, Enum
         {
-            if (steps.Count == 0) return SkillPlanStatus.NotStarted;
-
-            var completedRatio = steps.Count(s => s.IsCompleted) / (double)steps.Count;
-            return completedRatio switch
-            {
-                <= 0 => SkillPlanStatus.NotStarted,
-                >= 1 => SkillPlanStatus.Completed,
-                < 0.5 => SkillPlanStatus.Learning,
-                _ => SkillPlanStatus.Practicing
-            };
+            if (!Enum.TryParse<TEnum>(value, ignoreCase: true, out var result) || !Enum.IsDefined(result))
+                throw new ArgumentException(
+                    $"'{value}' is not a valid {fieldName}. Valid values: {string.Join(", ", Enum.GetNames<TEnum>())}.");
+            return result;
         }
 
         private static SkillImprovementPlanDto MapToDto(SkillImprovementPlan p)
@@ -198,7 +218,10 @@ namespace IRAS.Application.Modules.SkillImprovementPlans
                         UploadedAt = e.UploadedAt,
                         VerificationStatus = e.VerificationStatus.ToString(),
                         VerifiedAt = e.VerifiedAt,
-                        VerifierNotes = e.VerifierNotes
+                        VerifierNotes = e.VerifierNotes,
+                        AiConfidenceScore = e.AiConfidenceScore,
+                        AiRationale = e.AiRationale,
+                        AutoReviewed = e.AutoReviewed
                     }).ToList()
             };
         }

@@ -53,6 +53,14 @@ namespace IRAS.API.Controllers
             return Ok(await _service.SetStepCompletionAsync(candidateId, planId, stepId, request.IsCompleted, ct));
         }
 
+        [HttpPut("{planId:int}/progress")]
+        public async Task<IActionResult> UpdateProgress(
+            int candidateId, int planId, [FromBody] UpdatePlanProgressRequest request, CancellationToken ct)
+        {
+            var deny = CheckAccess(candidateId); if (deny != null) return deny;
+            return Ok(await _service.UpdateProgressAsync(candidateId, planId, request, ct));
+        }
+
         // Two actions sharing one route, disambiguated at runtime by [Consumes] — same
         // pattern as CandidateProfileController's certification upload. The Swagger
         // conflict this causes is already resolved globally in Program.cs
@@ -84,6 +92,16 @@ namespace IRAS.API.Controllers
             var deny = CheckAccess(candidateId); if (deny != null) return deny;
             await _evidence.RemoveEvidenceAsync(candidateId, planId, evidenceId, ct);
             return NoContent();
+        }
+
+        // The candidate's explicit "Submit for Review" action — evidence sits as Draft
+        // (visible only to the candidate) until this is called, at which point it enters
+        // the Pending/AI-triage pipeline and becomes visible to admin.
+        [HttpPut("{planId:int}/evidence/{evidenceId:int}/submit")]
+        public async Task<IActionResult> SubmitEvidence(int candidateId, int planId, int evidenceId, CancellationToken ct)
+        {
+            var deny = CheckAccess(candidateId); if (deny != null) return deny;
+            return Ok(await _evidence.SubmitEvidenceForReviewAsync(candidateId, planId, evidenceId, ct));
         }
     }
 }
