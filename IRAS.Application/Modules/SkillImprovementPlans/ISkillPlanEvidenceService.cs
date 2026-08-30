@@ -21,8 +21,11 @@ namespace IRAS.Application.Modules.SkillImprovementPlans
 
         Task<List<AdminEvidenceReviewDto>> GetPendingEvidenceAsync(CancellationToken ct);
 
-        // Approving only ever promotes the plan to Verified once its roadmap is already
-        // 100% complete; rejecting never downgrades the plan's own status.
+        // Three-way admin decision: Approve | Reject | RequestRevision. Approving only ever
+        // promotes the plan to Verified (and syncs CandidateTargetSkill/CandidateSkill) once
+        // its roadmap is already 100% complete; rejecting or requesting revision never
+        // downgrades the plan's own status — the candidate can resubmit new evidence either
+        // way. Every decision is written to the audit log.
         Task<SkillPlanEvidenceDto> VerifyEvidenceAsync(
             int adminId, int evidenceId, VerifyEvidenceRequest request, CancellationToken ct);
     }

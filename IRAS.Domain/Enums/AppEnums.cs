@@ -8,7 +8,7 @@ namespace IRAS.Domain.Enums
     public enum ParseStatus { Pending, Parsed, Failed, ManuallyEdited }
 
     public enum ProficiencyLevel { Beginner, Intermediate, Advanced, Expert }
-    public enum SkillSource { ResumeParsed, ManuallyAdded, ChatbotInferred }
+    public enum SkillSource { ResumeParsed, ManuallyAdded, ChatbotInferred, VerifiedImprovement }
     public enum SkillCategory { ProgrammingLanguage, Framework, Database, CloudPlatform, Tool, SoftSkill, Other }
     public enum AliasSource { SystemSeeded, AdminAdded, LearnedFromParsing }
 
@@ -20,7 +20,7 @@ namespace IRAS.Domain.Enums
     public enum SkillPlanStatus { NotStarted, Learning, Practicing, Completed, Verified }
 
     public enum SkillEvidenceType { GitHub, File, Screenshot, Certificate, Other }
-    public enum EvidenceVerificationStatus { Pending, Approved, Rejected }
+    public enum EvidenceVerificationStatus { Pending, Approved, Rejected, RevisionRequired }
 
     public enum ImportanceLevel { MustHave, NiceToHave }
     public enum EmploymentType { FullTime, PartTime, Contract, Internship, Remote }

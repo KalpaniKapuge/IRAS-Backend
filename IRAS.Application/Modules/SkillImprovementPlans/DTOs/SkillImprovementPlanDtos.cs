@@ -105,16 +105,20 @@ namespace IRAS.Application.Modules.SkillImprovementPlans.DTOs
         public IFormFile? File { get; set; }
     }
 
+    // Approve => Evidence Approved (+ plan/skill promotion if roadmap complete).
+    // Reject => Evidence Rejected, terminal for this submission; candidate may resubmit.
+    // RequestRevision => Evidence RevisionRequired, candidate acts on VerifierNotes and resubmits.
     public class VerifyEvidenceRequest
     {
-        public bool Approved { get; set; }
+        [Required]
+        public string Decision { get; set; } = null!;   // Approve | Reject | RequestRevision
 
         [StringLength(1000)]
         public string? VerifierNotes { get; set; }
     }
 
-    // Admin-facing review queue row — flattened with enough candidate/skill context to
-    // review without a separate lookup per row.
+    // Admin-facing review queue row — flattened with enough candidate/skill/job context and
+    // a roadmap-completion summary to review without a separate lookup per row.
     public class AdminEvidenceReviewDto
     {
         public int EvidenceId { get; set; }
@@ -123,6 +127,7 @@ namespace IRAS.Application.Modules.SkillImprovementPlans.DTOs
         public string CandidateName { get; set; } = null!;
         public int SkillId { get; set; }
         public string SkillName { get; set; } = null!;
+        public string? JobTitle { get; set; }
         public string EvidenceType { get; set; } = null!;
         public string EvidenceUrl { get; set; } = null!;
         public string? Notes { get; set; }
@@ -130,5 +135,7 @@ namespace IRAS.Application.Modules.SkillImprovementPlans.DTOs
         public string VerificationStatus { get; set; } = null!;
         public int? AiConfidenceScore { get; set; }
         public string? AiRationale { get; set; }
+        public int StepsCompleted { get; set; }
+        public int TotalSteps { get; set; }
     }
 }

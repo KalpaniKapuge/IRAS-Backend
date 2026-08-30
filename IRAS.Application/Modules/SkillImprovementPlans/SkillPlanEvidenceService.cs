@@ -2,6 +2,7 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
+using IRAS.Application.Common.Audit;
 using IRAS.Application.Common.Options;
 using IRAS.Application.Common.Storage;
 using IRAS.Application.Modules.SkillImprovementPlans.DTOs;
@@ -14,6 +15,7 @@ namespace IRAS.Application.Modules.SkillImprovementPlans
     public class SkillPlanEvidenceService : ISkillPlanEvidenceService
     {
         private const long MaxEvidenceBytes = 10 * 1024 * 1024;
+        private const string EntityType = "SkillPlanEvidence";
 
         private static readonly HashSet<string> EvidenceExtensions = new(StringComparer.OrdinalIgnoreCase)
         {
@@ -35,14 +37,17 @@ namespace IRAS.Application.Modules.SkillImprovementPlans
         private readonly IFileStorage _storage;
         private readonly IEvidenceReviewer _reviewer;
         private readonly EvidenceReviewOptions _reviewOptions;
+        private readonly IAuditLogService _audit;
 
         public SkillPlanEvidenceService(
-            IrasDbContext db, IFileStorage storage, IEvidenceReviewer reviewer, IOptions<EvidenceReviewOptions> reviewOptions)
+            IrasDbContext db, IFileStorage storage, IEvidenceReviewer reviewer,
+            IOptions<EvidenceReviewOptions> reviewOptions, IAuditLogService audit)
         {
             _db = db;
             _storage = storage;
             _reviewer = reviewer;
             _reviewOptions = reviewOptions.Value;
+            _audit = audit;
         }
 
         public async Task<SkillPlanEvidenceDto> AddEvidenceLinkAsync(
@@ -81,7 +86,7 @@ namespace IRAS.Application.Modules.SkillImprovementPlans
                 evidence.AutoReviewed = true;
 
                 if (plan.Steps.Count > 0 && plan.Steps.All(s => s.IsCompleted))
-                    plan.Status = SkillPlanStatus.Verified;
+                    await PromoteToVerifiedAsync(plan, ct);
             }
             else if (review.ConfidenceScore <= _reviewOptions.AutoRejectThreshold)
             {
@@ -145,6 +150,8 @@ namespace IRAS.Application.Modules.SkillImprovementPlans
             return await _db.SkillPlanEvidence
                 .Include(e => e.Plan).ThenInclude(p => p.Skill)
                 .Include(e => e.Plan).ThenInclude(p => p.Candidate)
+                .Include(e => e.Plan).ThenInclude(p => p.Job)
+                .Include(e => e.Plan).ThenInclude(p => p.Steps)
                 .Where(e => e.VerificationStatus == EvidenceVerificationStatus.Pending)
                 .OrderBy(e => e.UploadedAt)
                 .Select(e => new AdminEvidenceReviewDto
@@ -155,13 +162,16 @@ namespace IRAS.Application.Modules.SkillImprovementPlans
                     CandidateName = e.Plan.Candidate.FirstName + " " + e.Plan.Candidate.LastName,
                     SkillId = e.Plan.SkillId,
                     SkillName = e.Plan.Skill.SkillName,
+                    JobTitle = e.Plan.Job != null ? e.Plan.Job.Title : null,
                     EvidenceType = e.EvidenceType.ToString(),
                     EvidenceUrl = e.EvidenceUrl,
                     Notes = e.Notes,
                     UploadedAt = e.UploadedAt,
                     VerificationStatus = e.VerificationStatus.ToString(),
                     AiConfidenceScore = e.AiConfidenceScore,
-                    AiRationale = e.AiRationale
+                    AiRationale = e.AiRationale,
+                    StepsCompleted = e.Plan.Steps.Count(s => s.IsCompleted),
+                    TotalSteps = e.Plan.Steps.Count
                 })
                 .ToListAsync(ct);
         }
@@ -169,27 +179,97 @@ namespace IRAS.Application.Modules.SkillImprovementPlans
         public async Task<SkillPlanEvidenceDto> VerifyEvidenceAsync(
             int adminId, int evidenceId, VerifyEvidenceRequest request, CancellationToken ct)
         {
+            var decision = ParseEnum<VerificationDecision>(request.Decision, nameof(request.Decision));
+
             var evidence = await _db.SkillPlanEvidence
                 .Include(e => e.Plan).ThenInclude(p => p.Steps)
                 .FirstOrDefaultAsync(e => e.EvidenceId == evidenceId, ct)
                 ?? throw new KeyNotFoundException("Evidence not found.");
 
-            evidence.VerificationStatus = request.Approved
-                ? EvidenceVerificationStatus.Approved
-                : EvidenceVerificationStatus.Rejected;
+            evidence.VerificationStatus = decision switch
+            {
+                VerificationDecision.Approve => EvidenceVerificationStatus.Approved,
+                VerificationDecision.Reject => EvidenceVerificationStatus.Rejected,
+                VerificationDecision.RequestRevision => EvidenceVerificationStatus.RevisionRequired,
+                _ => throw new ArgumentException($"Unhandled decision '{decision}'.")
+            };
             evidence.VerifiedBy = adminId;
             evidence.VerifiedAt = DateTime.UtcNow;
             evidence.VerifierNotes = string.IsNullOrWhiteSpace(request.VerifierNotes) ? null : request.VerifierNotes.Trim();
 
-            // Promote to Verified only once the roadmap is fully complete AND this evidence
-            // was approved. A rejection is feedback on the evidence, not a verdict on the
-            // candidate's underlying progress, so the plan's step-derived status is untouched.
-            if (request.Approved && evidence.Plan.Steps.Count > 0 && evidence.Plan.Steps.All(s => s.IsCompleted))
-                evidence.Plan.Status = SkillPlanStatus.Verified;
+            // Promote to Verified — and sync the candidate's real skill record — only once
+            // the roadmap is fully complete AND this evidence was approved. A rejection or
+            // revision request is feedback on the evidence, not a verdict on the candidate's
+            // underlying progress, so the plan's step-derived status is left untouched.
+            if (decision == VerificationDecision.Approve
+                && evidence.Plan.Steps.Count > 0 && evidence.Plan.Steps.All(s => s.IsCompleted))
+                await PromoteToVerifiedAsync(evidence.Plan, ct);
 
             await _db.SaveChangesAsync(ct);
+
+            await _audit.LogAsync(
+                adminId,
+                decision switch
+                {
+                    VerificationDecision.Approve => "SkillPlanEvidenceApproved",
+                    VerificationDecision.Reject => "SkillPlanEvidenceRejected",
+                    _ => "SkillPlanEvidenceRevisionRequested"
+                },
+                EntityType, evidenceId, ct);
+
             return MapToDto(evidence);
         }
+
+        // Runs once, from whichever path first satisfies "roadmap complete + evidence
+        // approved" — manual admin approval or the AI auto-approve branch. Marks the plan
+        // Verified, closes out the matching CandidateTargetSkill, and upserts the candidate's
+        // real CandidateSkill row so future job matching (which reads CandidateSkill live —
+        // see ApplicationService/JobMatchingService) immediately reflects the verified skill.
+        private async Task PromoteToVerifiedAsync(SkillImprovementPlan plan, CancellationToken ct)
+        {
+            plan.Status = SkillPlanStatus.Verified;
+
+            var targetSkill = await _db.CandidateTargetSkills
+                .FirstOrDefaultAsync(t => t.CandidateId == plan.CandidateId && t.SkillId == plan.SkillId, ct);
+            if (targetSkill != null)
+            {
+                targetSkill.Status = TargetSkillStatus.Completed;
+                targetSkill.CompletedAt = DateTime.UtcNow;
+            }
+
+            var proficiency = plan.TargetLevel switch
+            {
+                SkillTargetLevel.Beginner => ProficiencyLevel.Beginner,
+                SkillTargetLevel.Intermediate => ProficiencyLevel.Intermediate,
+                _ => ProficiencyLevel.Advanced
+            };
+
+            var candidateSkill = await _db.CandidateSkills
+                .FirstOrDefaultAsync(cs => cs.CandidateId == plan.CandidateId && cs.SkillId == plan.SkillId, ct);
+            if (candidateSkill == null)
+            {
+                _db.CandidateSkills.Add(new CandidateSkill
+                {
+                    CandidateId = plan.CandidateId,
+                    SkillId = plan.SkillId,
+                    Proficiency = proficiency,
+                    YearsExp = 0,
+                    Source = SkillSource.VerifiedImprovement,
+                    IsVerified = true
+                });
+            }
+            else
+            {
+                candidateSkill.IsVerified = true;
+                candidateSkill.Source = SkillSource.VerifiedImprovement;
+                // Never downgrade a proficiency the candidate already had self-reported (or
+                // previously verified) higher than what this plan's target level implies.
+                if (proficiency > candidateSkill.Proficiency)
+                    candidateSkill.Proficiency = proficiency;
+            }
+        }
+
+        private enum VerificationDecision { Approve, Reject, RequestRevision }
 
         private async Task EnsurePlanOwnedAsync(int candidateId, int planId, CancellationToken ct)
         {
