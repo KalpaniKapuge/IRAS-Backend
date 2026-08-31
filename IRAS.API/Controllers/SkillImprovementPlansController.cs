@@ -53,14 +53,6 @@ namespace IRAS.API.Controllers
             return Ok(await _service.SetStepCompletionAsync(candidateId, planId, stepId, request.IsCompleted, ct));
         }
 
-        [HttpPut("{planId:int}/progress")]
-        public async Task<IActionResult> UpdateProgress(
-            int candidateId, int planId, [FromBody] UpdatePlanProgressRequest request, CancellationToken ct)
-        {
-            var deny = CheckAccess(candidateId); if (deny != null) return deny;
-            return Ok(await _service.UpdateProgressAsync(candidateId, planId, request, ct));
-        }
-
         // Two actions sharing one route, disambiguated at runtime by [Consumes] — same
         // pattern as CandidateProfileController's certification upload. The Swagger
         // conflict this causes is already resolved globally in Program.cs

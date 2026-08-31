@@ -17,7 +17,7 @@ namespace IRAS.Application.Common.Audit
             _httpContextAccessor = httpContextAccessor;
         }
 
-        public async Task LogAsync(int userId, string action, string entityType, int entityId, CancellationToken ct)
+        public async Task LogAsync(int userId, string action, string entityType, int entityId, CancellationToken ct, string? details = null)
         {
             var ipAddress = _httpContextAccessor.HttpContext?.Connection.RemoteIpAddress?.ToString();
 
@@ -27,7 +27,8 @@ namespace IRAS.Application.Common.Audit
                 Action = action,
                 EntityType = entityType,
                 EntityId = entityId,
-                IpAddress = ipAddress
+                IpAddress = ipAddress,
+                Details = details
             });
             await _db.SaveChangesAsync(ct);
         }
@@ -48,6 +49,7 @@ namespace IRAS.Application.Common.Audit
                     EntityType = a.EntityType,
                     EntityId = a.EntityId,
                     IpAddress = a.IpAddress,
+                    Details = a.Details,
                     CreatedAt = a.CreatedAt
                 })
                 .ToListAsync(ct);

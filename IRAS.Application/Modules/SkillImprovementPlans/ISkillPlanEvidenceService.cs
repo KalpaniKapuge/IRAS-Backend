@@ -28,7 +28,9 @@ namespace IRAS.Application.Modules.SkillImprovementPlans
         Task<SkillPlanEvidenceDto> SubmitEvidenceForReviewAsync(
             int candidateId, int planId, int evidenceId, CancellationToken ct);
 
-        Task<List<AdminEvidenceReviewDto>> GetPendingEvidenceAsync(CancellationToken ct);
+        // status is an EvidenceVerificationStatus name; null/omitted defaults to "Pending"
+        // (today's queue behavior). Passing e.g. "Approved" returns decided history instead.
+        Task<List<AdminEvidenceReviewDto>> GetEvidenceForReviewAsync(string? status, CancellationToken ct);
 
         // Three-way admin decision: Approve | Reject | RequestRevision. Approving only ever
         // promotes the plan to Verified (and syncs CandidateTargetSkill/CandidateSkill) once

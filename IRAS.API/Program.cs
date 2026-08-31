@@ -156,13 +156,31 @@ builder.Services.AddScoped<ISkillPlanEvidenceService, SkillPlanEvidenceService>(
 
 builder.Services.Configure<EvidenceReviewOptions>(
     builder.Configuration.GetSection(EvidenceReviewOptions.SectionName));
-builder.Services.AddHttpClient<IEvidenceReviewer, GeminiEvidenceReviewer>((sp, client) =>
+
+// GeminiEvidenceReviewer's constructor throws if no API key is configured — unlike the other
+// Gemini-backed generators in this file (which have the same gap but aren't in scope here),
+// this one already has a purpose-built safe fallback (TemplateEvidenceReviewer: always routes
+// to manual review rather than guessing an approve/reject verdict), so it's used when no key
+// is present instead of the whole app failing to start or link-evidence submission crashing
+// at request time.
+var geminiConfigured = !string.IsNullOrWhiteSpace(
+    builder.Configuration.GetSection(GeminiOptions.SectionName).Get<GeminiOptions>()?.ApiKey)
+    || !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("GEMINI_API_KEY"));
+
+if (geminiConfigured)
 {
-    var opts = builder.Configuration.GetSection(GeminiOptions.SectionName).Get<GeminiOptions>()
-        ?? new GeminiOptions();
-    client.BaseAddress = new Uri(opts.BaseUrl);
-    client.Timeout = TimeSpan.FromSeconds(60);
-});
+    builder.Services.AddHttpClient<IEvidenceReviewer, GeminiEvidenceReviewer>((sp, client) =>
+    {
+        var opts = builder.Configuration.GetSection(GeminiOptions.SectionName).Get<GeminiOptions>()
+            ?? new GeminiOptions();
+        client.BaseAddress = new Uri(opts.BaseUrl);
+        client.Timeout = TimeSpan.FromSeconds(60);
+    });
+}
+else
+{
+    builder.Services.AddScoped<IEvidenceReviewer, TemplateEvidenceReviewer>();
+}
 
 builder.Services.AddHttpClient<ISkillGapExplainer, GeminiSkillGapExplainer>((sp, client) =>
 {

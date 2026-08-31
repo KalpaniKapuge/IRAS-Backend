@@ -11,6 +11,7 @@ namespace IRAS.Domain.Entities.Admin
         public string EntityType { get; set; } = null!;
         public int EntityId { get; set; }
         public string? IpAddress { get; set; }
+        public string? Details { get; set; }
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
         public User User { get; set; } = null!;

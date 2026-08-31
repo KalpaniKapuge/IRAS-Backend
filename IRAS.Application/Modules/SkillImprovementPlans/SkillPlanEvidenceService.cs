@@ -160,6 +160,15 @@ namespace IRAS.Application.Modules.SkillImprovementPlans
                 .FirstOrDefaultAsync(e => e.EvidenceId == evidenceId && e.PlanId == planId, ct)
                 ?? throw new KeyNotFoundException("Evidence not found.");
 
+            // Once submitted, evidence is either awaiting or has already received an admin
+            // decision — deleting it out from under that would let a candidate erase a
+            // Rejected/RevisionRequired record instead of addressing it, and deleting Pending
+            // evidence could race an admin who's mid-review. Only an un-submitted Draft is
+            // safe to delete freely.
+            if (evidence.VerificationStatus != EvidenceVerificationStatus.Draft)
+                throw new InvalidOperationException(
+                    "This evidence has already been submitted for review and can no longer be deleted.");
+
             _db.SkillPlanEvidence.Remove(evidence);
             await _db.SaveChangesAsync(ct);
 
@@ -169,15 +178,32 @@ namespace IRAS.Application.Modules.SkillImprovementPlans
                 await _storage.DeleteAsync(evidence.EvidenceUrl, ct);
         }
 
-        public async Task<List<AdminEvidenceReviewDto>> GetPendingEvidenceAsync(CancellationToken ct)
+        public async Task<List<AdminEvidenceReviewDto>> GetEvidenceForReviewAsync(string? status, CancellationToken ct)
         {
-            return await _db.SkillPlanEvidence
+            var parsedStatus = string.IsNullOrWhiteSpace(status)
+                ? EvidenceVerificationStatus.Pending
+                : ParseEnum<EvidenceVerificationStatus>(status, nameof(status));
+
+            // Draft is deliberately excluded even if explicitly requested — it's the
+            // candidate's own not-yet-submitted working copy, never something an admin
+            // reviews or has a decision to show for.
+            if (parsedStatus == EvidenceVerificationStatus.Draft)
+                throw new ArgumentException("Draft evidence has not been submitted and has nothing to review.");
+
+            var query = _db.SkillPlanEvidence
                 .Include(e => e.Plan).ThenInclude(p => p.Skill)
                 .Include(e => e.Plan).ThenInclude(p => p.Candidate)
                 .Include(e => e.Plan).ThenInclude(p => p.Job)
                 .Include(e => e.Plan).ThenInclude(p => p.Steps)
-                .Where(e => e.VerificationStatus == EvidenceVerificationStatus.Pending)
-                .OrderBy(e => e.UploadedAt)
+                .Where(e => e.VerificationStatus == parsedStatus);
+
+            // Oldest-first for the actionable Pending queue (first submitted, first reviewed);
+            // most-recent-first for history views, where the last few decisions matter most.
+            query = parsedStatus == EvidenceVerificationStatus.Pending
+                ? query.OrderBy(e => e.UploadedAt)
+                : query.OrderByDescending(e => e.VerifiedAt);
+
+            return await query
                 .Select(e => new AdminEvidenceReviewDto
                 {
                     EvidenceId = e.EvidenceId,
@@ -199,7 +225,9 @@ namespace IRAS.Application.Modules.SkillImprovementPlans
                     AiConfidenceScore = e.AiConfidenceScore,
                     AiRationale = e.AiRationale,
                     StepsCompleted = e.Plan.Steps.Count(s => s.IsCompleted),
-                    TotalSteps = e.Plan.Steps.Count
+                    TotalSteps = e.Plan.Steps.Count,
+                    VerifiedAt = e.VerifiedAt,
+                    VerifierNotes = e.VerifierNotes
                 })
                 .ToListAsync(ct);
         }
@@ -248,7 +276,7 @@ namespace IRAS.Application.Modules.SkillImprovementPlans
                     VerificationDecision.Reject => "SkillPlanEvidenceRejected",
                     _ => "SkillPlanEvidenceRevisionRequested"
                 },
-                EntityType, evidenceId, ct);
+                EntityType, evidenceId, ct, details: evidence.VerifierNotes);
 
             return MapToDto(evidence);
         }

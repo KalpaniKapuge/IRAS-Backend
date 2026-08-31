@@ -1,6 +1,21 @@
 // IRAS.Application/Modules/Admin/DTOs/AdminDtos.cs
+using System.ComponentModel.DataAnnotations;
+
 namespace IRAS.Application.Modules.Admin.DTOs
 {
+    // Admin accounts are deliberately never self-registerable (see RegisterRequest.Validate)
+    // — the only way to provision one beyond the initial seeded bootstrap account is an
+    // already-logged-in admin creating another one here. No FirstName/LastName/CompanyName:
+    // unlike Candidate/Employer, Admin has no profile row, just the bare User record.
+    public class CreateAdminUserRequest
+    {
+        [Required, EmailAddress]
+        public string Email { get; set; } = null!;
+
+        [Required, MinLength(8, ErrorMessage = "Password must be at least 8 characters long.")]
+        public string Password { get; set; } = null!;
+    }
+
     public class UserSummaryDto
     {
         public int UserId { get; set; }

@@ -8,7 +8,10 @@ namespace IRAS.Application.Common.Audit
     // not admin actions requiring an accountability trail).
     public interface IAuditLogService
     {
-        Task LogAsync(int userId, string action, string entityType, int entityId, CancellationToken ct);
+        // details is optional free text for actions that carry a human-written comment (e.g.
+        // a skill-evidence rejection reason) — most actions have nothing to add here and pass
+        // nothing, which is why every existing call site above still compiles unchanged.
+        Task LogAsync(int userId, string action, string entityType, int entityId, CancellationToken ct, string? details = null);
 
         Task<List<AuditLogDto>> GetRecentAsync(int take, CancellationToken ct);
     }

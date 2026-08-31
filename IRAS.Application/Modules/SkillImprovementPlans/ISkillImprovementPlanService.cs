@@ -14,13 +14,10 @@ namespace IRAS.Application.Modules.SkillImprovementPlans
         Task<SkillImprovementPlanDto> GeneratePlanAsync(
             int candidateId, int skillId, GeneratePlanRequest request, CancellationToken ct);
 
+        // Toggling a step also recomputes the plan's overall Status from the resulting
+        // checklist completion fraction — progress is never candidate-selectable, only ever
+        // derived from actual task completion (see SkillImprovementPlanService).
         Task<SkillImprovementPlanDto> SetStepCompletionAsync(
             int candidateId, int planId, int stepId, bool isCompleted, CancellationToken ct);
-
-        // Candidate's own self-reported progress (NotStarted/Learning/Practicing/
-        // PartiallyCompleted/Completed). Rejects Verified — that's system-only — and rejects
-        // any change once the plan is already Verified.
-        Task<SkillImprovementPlanDto> UpdateProgressAsync(
-            int candidateId, int planId, UpdatePlanProgressRequest request, CancellationToken ct);
     }
 }

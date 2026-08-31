@@ -60,14 +60,6 @@ namespace IRAS.Application.Modules.SkillImprovementPlans.DTOs
         public bool IsCompleted { get; set; } = true;
     }
 
-    // The candidate's own self-reported progress — independent of (and never overrides)
-    // Verified, which only SkillPlanEvidenceService can set once evidence is approved.
-    public class UpdatePlanProgressRequest
-    {
-        [Required]
-        public string Status { get; set; } = null!;   // NotStarted | Learning | Practicing | PartiallyCompleted | Completed
-    }
-
     public class SkillPlanEvidenceDto
     {
         public int EvidenceId { get; set; }
@@ -153,5 +145,10 @@ namespace IRAS.Application.Modules.SkillImprovementPlans.DTOs
         public string? AiRationale { get; set; }
         public int StepsCompleted { get; set; }
         public int TotalSteps { get; set; }
+
+        // Populated only once a decision has been made — lets the admin history view (any
+        // status other than Pending) show what was already decided and why, read-only.
+        public DateTime? VerifiedAt { get; set; }
+        public string? VerifierNotes { get; set; }
     }
 }

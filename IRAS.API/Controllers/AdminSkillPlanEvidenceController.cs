@@ -19,9 +19,14 @@ namespace IRAS.API.Controllers
         private readonly ISkillPlanEvidenceService _service;
         public AdminSkillPlanEvidenceController(ISkillPlanEvidenceService service) => _service = service;
 
+        // status omitted/"Pending" = the actionable queue (default, unchanged behavior);
+        // any other EvidenceVerificationStatus name = read-only decision history for that
+        // status. "pending" kept as an explicit alias of the same root route so any existing
+        // caller/bookmark of the old URL keeps working.
+        [HttpGet]
         [HttpGet("pending")]
-        public async Task<IActionResult> GetPending(CancellationToken ct)
-            => Ok(await _service.GetPendingEvidenceAsync(ct));
+        public async Task<IActionResult> GetForReview([FromQuery] string? status, CancellationToken ct)
+            => Ok(await _service.GetEvidenceForReviewAsync(status, ct));
 
         [HttpPut("{evidenceId:int}/verify")]
         public async Task<IActionResult> Verify(int evidenceId, VerifyEvidenceRequest request, CancellationToken ct)

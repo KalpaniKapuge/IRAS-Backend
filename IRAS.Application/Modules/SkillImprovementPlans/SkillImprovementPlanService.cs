@@ -120,39 +120,32 @@ namespace IRAS.Application.Modules.SkillImprovementPlans
             step.IsCompleted = isCompleted;
             step.CompletedAt = isCompleted ? DateTime.UtcNow : null;
 
-            // The checklist only ever nudges progress forward at its two unambiguous
-            // endpoints — starting it, and finishing it 100%. Everything in between
-            // (Learning/Practicing/PartiallyCompleted) is the candidate's own call via
-            // UpdateProgressAsync, so a checkbox toggle never overwrites that self-report.
             if (plan.Status != SkillPlanStatus.Verified)
-            {
-                if (plan.Steps.Count > 0 && plan.Steps.All(s => s.IsCompleted))
-                    plan.Status = SkillPlanStatus.Completed;
-                else if (plan.Status == SkillPlanStatus.NotStarted && plan.Steps.Any(s => s.IsCompleted))
-                    plan.Status = SkillPlanStatus.Learning;
-            }
+                plan.Status = DeriveStatusFromProgress(plan.Steps);
 
             await _db.SaveChangesAsync(ct);
 
             return MapToDto(plan);
         }
 
-        public async Task<SkillImprovementPlanDto> UpdateProgressAsync(
-            int candidateId, int planId, UpdatePlanProgressRequest request, CancellationToken ct)
+        // Progress is entirely derived from the roadmap checklist — never a candidate's own
+        // self-report — so it can never show a stage (e.g. "Completed") that the candidate's
+        // actual task completion doesn't back up. Verified is excluded: only
+        // SkillPlanEvidenceService.PromoteToVerifiedAsync ever sets that, once approved
+        // evidence exists for an already-100%-complete roadmap.
+        private static SkillPlanStatus DeriveStatusFromProgress(ICollection<SkillPlanStep> steps)
         {
-            var plan = await LoadOwnedPlanAsync(candidateId, planId, ct);
+            if (steps.Count == 0) return SkillPlanStatus.NotStarted;
 
-            if (plan.Status == SkillPlanStatus.Verified)
-                throw new ArgumentException("This skill has already been verified — its progress can no longer be changed.");
-
-            var status = ParseEnum<SkillPlanStatus>(request.Status, nameof(request.Status));
-            if (status == SkillPlanStatus.Verified)
-                throw new ArgumentException("Verified is set automatically once evidence is approved — it can't be set directly.");
-
-            plan.Status = status;
-            await _db.SaveChangesAsync(ct);
-
-            return MapToDto(plan);
+            var fraction = (double)steps.Count(s => s.IsCompleted) / steps.Count;
+            return fraction switch
+            {
+                <= 0 => SkillPlanStatus.NotStarted,
+                >= 1 => SkillPlanStatus.Completed,
+                < 1.0 / 3 => SkillPlanStatus.Learning,
+                < 2.0 / 3 => SkillPlanStatus.Practicing,
+                _ => SkillPlanStatus.PartiallyCompleted
+            };
         }
 
         private async Task<SkillImprovementPlan> LoadOwnedPlanAsync(int candidateId, int planId, CancellationToken ct)
@@ -176,6 +169,13 @@ namespace IRAS.Application.Modules.SkillImprovementPlans
             var steps = p.Steps.OrderBy(s => s.StepOrder).ToList();
             var progress = steps.Count == 0 ? 0 : (int)Math.Round(100.0 * steps.Count(s => s.IsCompleted) / steps.Count);
 
+            // Recomputed on every read (not just trusted from the stored column) so a plan's
+            // displayed status is always consistent with its actual checklist completion —
+            // self-healing for any row whose Status predates this derivation existing, with
+            // no data migration needed. Verified is the one exception: it's a one-way,
+            // evidence-driven fact set by SkillPlanEvidenceService, never derived from steps.
+            var status = p.Status == SkillPlanStatus.Verified ? p.Status : DeriveStatusFromProgress(steps);
+
             return new SkillImprovementPlanDto
             {
                 PlanId = p.PlanId,
@@ -191,7 +191,7 @@ namespace IRAS.Application.Modules.SkillImprovementPlans
                 ProjectTitle = p.ProjectTitle,
                 ProjectTask = p.ProjectTask,
                 ProjectExpectedOutput = p.ProjectExpectedOutput,
-                Status = p.Status.ToString(),
+                Status = status.ToString(),
                 GeneratedBy = p.GeneratedBy,
                 CreatedAt = p.CreatedAt,
                 ProgressPercent = progress,

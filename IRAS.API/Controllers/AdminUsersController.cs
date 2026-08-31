@@ -24,6 +24,10 @@ namespace IRAS.API.Controllers
         public async Task<IActionResult> GetById(int userId, CancellationToken ct)
             => Ok(await _service.GetByIdAsync(userId, ct));
 
+        [HttpPost("admins")]
+        public async Task<IActionResult> CreateAdmin(CreateAdminUserRequest request, CancellationToken ct)
+            => Ok(await _service.CreateAdminAsync(User.GetUserId(), request, ct));
+
         [HttpPut("{userId:int}/status")]
         public async Task<IActionResult> SetActive(int userId, SetUserActiveRequest request, CancellationToken ct)
         {

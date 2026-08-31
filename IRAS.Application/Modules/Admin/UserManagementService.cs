@@ -40,6 +40,28 @@ namespace IRAS.Application.Modules.Admin
             return ToDto(user);
         }
 
+        public async Task<UserSummaryDto> CreateAdminAsync(int adminId, CreateAdminUserRequest request, CancellationToken ct)
+        {
+            var email = request.Email.Trim();
+            var exists = await _db.Users.AnyAsync(u => u.Email == email, ct);
+            if (exists)
+                throw new InvalidOperationException("An account with this email already exists.");
+
+            var user = new User
+            {
+                Email = email,
+                PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Password),
+                Role = UserRole.Admin,
+                IsActive = true
+            };
+            _db.Users.Add(user);
+            await _db.SaveChangesAsync(ct);
+
+            await _audit.LogAsync(adminId, "AdminUserCreated", EntityType, user.UserId, ct, details: email);
+
+            return ToDto(user);
+        }
+
         public async Task SetActiveAsync(int adminId, int userId, bool isActive, CancellationToken ct)
         {
             if (userId == adminId)
