@@ -32,6 +32,7 @@ namespace IRAS.Application.Modules.Applications.DTOs
         public decimal ExperienceMatch { get; set; }
         public decimal EducationMatch { get; set; }
         public decimal SemanticSimilarity { get; set; }
+        public decimal? AssessmentScore { get; set; }
         public DateTime AppliedAt { get; set; }
         public List<SkillGapDto> SkillGaps { get; set; } = new();
     }
@@ -47,6 +48,7 @@ namespace IRAS.Application.Modules.Applications.DTOs
         public decimal ExperienceMatch { get; set; }
         public decimal EducationMatch { get; set; }
         public decimal SemanticSimilarity { get; set; }
+        public decimal? AssessmentScore { get; set; }
         public DateTime AppliedAt { get; set; }
         public List<SkillGapDto> SkillGaps { get; set; } = new();
     }

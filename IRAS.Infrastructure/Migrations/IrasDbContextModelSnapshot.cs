@@ -108,6 +108,9 @@ namespace IRAS.Infrastructure.Migrations
                     b.Property<DateTime>("AppliedAt")
                         .HasColumnType("datetime2");
 
+                    b.Property<decimal?>("AssessmentScore")
+                        .HasColumnType("decimal(5,4)");
+
                     b.Property<int>("CandidateId")
                         .HasColumnType("int");
 
@@ -280,6 +283,141 @@ namespace IRAS.Infrastructure.Migrations
                     b.HasIndex("SkillId");
 
                     b.ToTable("SkillGaps", "applications");
+                });
+
+            modelBuilder.Entity("IRAS.Domain.Entities.Assessments.AssessmentQuestion", b =>
+                {
+                    b.Property<int>("AssessmentQuestionId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("AssessmentQuestionId"));
+
+                    b.Property<int>("CorrectOptionIndex")
+                        .HasColumnType("int");
+
+                    b.Property<int>("JobAssessmentId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Options")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("QuestionOrder")
+                        .HasColumnType("int");
+
+                    b.Property<string>("QuestionText")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int?>("SkillId")
+                        .HasColumnType("int");
+
+                    b.HasKey("AssessmentQuestionId");
+
+                    b.HasIndex("JobAssessmentId");
+
+                    b.HasIndex("SkillId");
+
+                    b.ToTable("AssessmentQuestions", "assessments");
+                });
+
+            modelBuilder.Entity("IRAS.Domain.Entities.Assessments.CandidateAssessmentAnswer", b =>
+                {
+                    b.Property<int>("AnswerId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("AnswerId"));
+
+                    b.Property<int>("AssessmentQuestionId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("AttemptId")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("IsCorrect")
+                        .HasColumnType("bit");
+
+                    b.Property<int>("SelectedOptionIndex")
+                        .HasColumnType("int");
+
+                    b.HasKey("AnswerId");
+
+                    b.HasIndex("AssessmentQuestionId");
+
+                    b.HasIndex("AttemptId");
+
+                    b.ToTable("CandidateAssessmentAnswers", "assessments");
+                });
+
+            modelBuilder.Entity("IRAS.Domain.Entities.Assessments.CandidateAssessmentAttempt", b =>
+                {
+                    b.Property<int>("AttemptId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("AttemptId"));
+
+                    b.Property<int>("CandidateId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("CompletedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("JobAssessmentId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("JobId")
+                        .HasColumnType("int");
+
+                    b.Property<decimal?>("Score")
+                        .HasColumnType("decimal(5,4)");
+
+                    b.Property<DateTime>("StartedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.HasKey("AttemptId");
+
+                    b.HasIndex("JobAssessmentId");
+
+                    b.HasIndex("JobId");
+
+                    b.HasIndex("CandidateId", "JobId")
+                        .IsUnique();
+
+                    b.ToTable("CandidateAssessmentAttempts", "assessments");
+                });
+
+            modelBuilder.Entity("IRAS.Domain.Entities.Assessments.JobAssessment", b =>
+                {
+                    b.Property<int>("JobAssessmentId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("JobAssessmentId"));
+
+                    b.Property<DateTime>("GeneratedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("GeneratedBy")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("JobId")
+                        .HasColumnType("int");
+
+                    b.HasKey("JobAssessmentId");
+
+                    b.HasIndex("JobId")
+                        .IsUnique();
+
+                    b.ToTable("JobAssessments", "assessments");
                 });
 
             modelBuilder.Entity("IRAS.Domain.Entities.Candidate.CandidateLanguage", b =>
@@ -903,6 +1041,9 @@ namespace IRAS.Infrastructure.Migrations
                     b.Property<DateTime?>("PostedAt")
                         .HasColumnType("datetime2");
 
+                    b.Property<bool>("RequireAssessment")
+                        .HasColumnType("bit");
+
                     b.Property<string>("RequirementInput")
                         .HasColumnType("nvarchar(max)");
 
@@ -1432,6 +1573,81 @@ namespace IRAS.Infrastructure.Migrations
                     b.Navigation("Skill");
                 });
 
+            modelBuilder.Entity("IRAS.Domain.Entities.Assessments.AssessmentQuestion", b =>
+                {
+                    b.HasOne("IRAS.Domain.Entities.Assessments.JobAssessment", "JobAssessment")
+                        .WithMany("Questions")
+                        .HasForeignKey("JobAssessmentId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("IRAS.Domain.Entities.Skills.Skill", "Skill")
+                        .WithMany()
+                        .HasForeignKey("SkillId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("JobAssessment");
+
+                    b.Navigation("Skill");
+                });
+
+            modelBuilder.Entity("IRAS.Domain.Entities.Assessments.CandidateAssessmentAnswer", b =>
+                {
+                    b.HasOne("IRAS.Domain.Entities.Assessments.AssessmentQuestion", "Question")
+                        .WithMany()
+                        .HasForeignKey("AssessmentQuestionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("IRAS.Domain.Entities.Assessments.CandidateAssessmentAttempt", "Attempt")
+                        .WithMany("Answers")
+                        .HasForeignKey("AttemptId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Attempt");
+
+                    b.Navigation("Question");
+                });
+
+            modelBuilder.Entity("IRAS.Domain.Entities.Assessments.CandidateAssessmentAttempt", b =>
+                {
+                    b.HasOne("IRAS.Domain.Entities.Candidate.CandidateProfile", "Candidate")
+                        .WithMany()
+                        .HasForeignKey("CandidateId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("IRAS.Domain.Entities.Assessments.JobAssessment", "JobAssessment")
+                        .WithMany()
+                        .HasForeignKey("JobAssessmentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("IRAS.Domain.Entities.Jobs.Job", "Job")
+                        .WithMany()
+                        .HasForeignKey("JobId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Candidate");
+
+                    b.Navigation("Job");
+
+                    b.Navigation("JobAssessment");
+                });
+
+            modelBuilder.Entity("IRAS.Domain.Entities.Assessments.JobAssessment", b =>
+                {
+                    b.HasOne("IRAS.Domain.Entities.Jobs.Job", "Job")
+                        .WithMany()
+                        .HasForeignKey("JobId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Job");
+                });
+
             modelBuilder.Entity("IRAS.Domain.Entities.Candidate.CandidateLanguage", b =>
                 {
                     b.HasOne("IRAS.Domain.Entities.Candidate.CandidateProfile", "Candidate")
@@ -1780,6 +1996,16 @@ namespace IRAS.Infrastructure.Migrations
                     b.Navigation("SkillGaps");
 
                     b.Navigation("StatusHistory");
+                });
+
+            modelBuilder.Entity("IRAS.Domain.Entities.Assessments.CandidateAssessmentAttempt", b =>
+                {
+                    b.Navigation("Answers");
+                });
+
+            modelBuilder.Entity("IRAS.Domain.Entities.Assessments.JobAssessment", b =>
+                {
+                    b.Navigation("Questions");
                 });
 
             modelBuilder.Entity("IRAS.Domain.Entities.Candidate.CandidateProfile", b =>

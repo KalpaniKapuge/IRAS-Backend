@@ -76,6 +76,11 @@ namespace IRAS.Application.Modules.Jobs.DTOs
 
         [MinLength(1, ErrorMessage = "At least one required skill is needed.")]
         public List<JobRequiredSkillDto> RequiredSkills { get; set; } = new();
+
+        // Employer's per-job toggle — when true, candidates must complete a skill
+        // assessment for this job before they can apply (see AssessmentsController /
+        // ApplicationService.ApplyAsync).
+        public bool RequireAssessment { get; set; }
     }
 
     public class GenerateJdRequest
@@ -127,6 +132,8 @@ namespace IRAS.Application.Modules.Jobs.DTOs
 
         [StringLength(20)]
         public string? TemplateKey { get; set; }
+
+        public bool RequireAssessment { get; set; }
     }
 
     public class JobDto
@@ -147,6 +154,7 @@ namespace IRAS.Application.Modules.Jobs.DTOs
         public DateTime? PostedAt { get; set; }
         public DateTime? ClosingDate { get; set; }
         public string? TemplateKey { get; set; }
+        public bool RequireAssessment { get; set; }
         public int ApplicationCount { get; set; }
         public List<JobRequiredSkillDto> RequiredSkills { get; set; } = new();
     }

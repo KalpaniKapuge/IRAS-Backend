@@ -9,7 +9,7 @@ namespace IRAS.Application.Common.Scoring
     {
         public ValidateOptionsResult Validate(string? name, ScoringOptions options)
         {
-            var sum = options.SkillMatchWeight + options.SemanticSimilarityWeight + options.MlFitScoreWeight;
+            var sum = options.SkillMatchWeight + options.SemanticSimilarityWeight + options.MlFitScoreWeight + options.AssessmentScoreWeight;
             if (Math.Abs(sum - 1.0m) > 0.001m)
                 return ValidateOptionsResult.Fail($"Scoring weights must sum to 1.0 (currently {sum}).");
 

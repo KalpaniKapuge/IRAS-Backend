@@ -18,6 +18,7 @@ namespace IRAS.Domain.Entities.Applications
         public decimal ExperienceMatch { get; set; }
         public decimal EducationMatch { get; set; }
         public decimal SemanticSimilarity { get; set; }
+        public decimal? AssessmentScore { get; set; }        // 0..1, from the job's required skill assessment; null if not required/not taken
 
         public DateTime AppliedAt { get; set; } = DateTime.UtcNow;
         public DateTime? UpdatedAt { get; set; }

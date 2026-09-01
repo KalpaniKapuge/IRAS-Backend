@@ -51,11 +51,13 @@ namespace IRAS.Application.Common.Scoring
             return Math.Round((decimal)((int)candidateLevel + 1) / ((int)requiredLevel + 1), 4);
         }
 
-        public decimal ComputeTotalScore(decimal skillMatch, decimal semanticSimilarity, decimal? mlFitScore = null)
+        public decimal ComputeTotalScore(decimal skillMatch, decimal semanticSimilarity, decimal? mlFitScore = null, decimal? assessmentScore = null)
         {
             var score = _options.SkillMatchWeight * skillMatch + _options.SemanticSimilarityWeight * semanticSimilarity;
             if (mlFitScore.HasValue)
                 score += _options.MlFitScoreWeight * mlFitScore.Value;
+            if (assessmentScore.HasValue)
+                score += _options.AssessmentScoreWeight * assessmentScore.Value;
             return Math.Round(score, 4);
         }
 

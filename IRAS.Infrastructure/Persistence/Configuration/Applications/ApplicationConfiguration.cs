@@ -13,7 +13,7 @@ namespace IRAS.Infrastructure.Persistence.Configuration.Applications
 
             builder.HasIndex(a => new { a.CandidateId, a.JobId }).IsUnique();
 
-            foreach (var prop in new[] { "TotalScore", "SkillMatch", "ExperienceMatch", "EducationMatch", "SemanticSimilarity" })
+            foreach (var prop in new[] { "TotalScore", "SkillMatch", "ExperienceMatch", "EducationMatch", "SemanticSimilarity", "AssessmentScore" })
                 builder.Property(prop).HasColumnType("decimal(5,4)");
 
             builder.HasOne(a => a.Resume).WithMany()

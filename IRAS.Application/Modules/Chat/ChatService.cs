@@ -1,9 +1,7 @@
 // IRAS.Application/Modules/Chat/ChatService.cs
 using Microsoft.EntityFrameworkCore;
-using IRAS.Application.Modules.Applications;
+using IRAS.Application.Modules.Chat.ContextBuilders;
 using IRAS.Application.Modules.Chat.DTOs;
-using IRAS.Application.Modules.Matching;
-using IRAS.Application.Modules.SkillGaps;
 using IRAS.Application.Common.Notifications;
 using IRAS.Domain.Entities.Engagement;
 using IRAS.Domain.Enums;
@@ -15,21 +13,17 @@ namespace IRAS.Application.Modules.Chat
     {
         private readonly IrasDbContext _db;
         private readonly IChatResponder _responder;
-        private readonly ISkillGapService _skillGaps;
-        private readonly IApplicationService _applications;
-        private readonly IJobMatchingService _matching;
         private readonly INotificationService _notifications;
+        private readonly IReadOnlyDictionary<string, IChatContextBuilder> _contextBuilders;
 
         public ChatService(
-            IrasDbContext db, IChatResponder responder, ISkillGapService skillGaps,
-            IApplicationService applications, IJobMatchingService matching, INotificationService notifications)
+            IrasDbContext db, IChatResponder responder, INotificationService notifications,
+            IEnumerable<IChatContextBuilder> contextBuilders)
         {
             _db = db;
             _responder = responder;
-            _skillGaps = skillGaps;
-            _applications = applications;
-            _matching = matching;
             _notifications = notifications;
+            _contextBuilders = contextBuilders.ToDictionary(b => b.Role);
         }
 
         public async Task<ChatReplyDto> SendMessageAsync(int userId, string role, SendChatMessageRequest request, CancellationToken ct)
@@ -91,17 +85,13 @@ namespace IRAS.Application.Modules.Chat
                 .Select(k => new KnowledgeBaseItem(k.Title, k.Content))
                 .ToListAsync(ct);
 
-            var isCandidate = role == "Candidate";
-            if (!isCandidate)
-                return new ChatContext(false, kb, [], [], [], 0);
-
-            var skillGaps = await _skillGaps.GetMyGapSummaryAsync(userId, ct);
-            var applications = await _applications.GetMyApplicationsAsync(userId, ct);
-            var matches = await _matching.GetMyMatchesAsync(userId, ct);
             var notifications = await _notifications.GetMyNotificationsAsync(userId, ct);
             var unreadCount = notifications.Count(n => !n.IsRead);
 
-            return new ChatContext(true, kb, skillGaps, applications, matches, unreadCount);
+            if (!_contextBuilders.TryGetValue(role, out var builder))
+                return new ChatContext(role, kb, unreadCount, null, null, null);
+
+            return await builder.BuildAsync(userId, kb, unreadCount, ct);
         }
     }
 }

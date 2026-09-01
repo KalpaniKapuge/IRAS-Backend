@@ -9,6 +9,7 @@ using IRAS.Domain.Entities.Applications;
 using IRAS.Domain.Entities.Feedback;
 using IRAS.Domain.Entities.Engagement;
 using IRAS.Domain.Entities.Admin;
+using IRAS.Domain.Entities.Assessments;
 
 namespace IRAS.Infrastructure.Data
 {
@@ -48,6 +49,10 @@ namespace IRAS.Infrastructure.Data
         public DbSet<ChatMessage> ChatMessages => Set<ChatMessage>();
         public DbSet<KnowledgeBase> KnowledgeBases => Set<KnowledgeBase>();
         public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
+        public DbSet<JobAssessment> JobAssessments => Set<JobAssessment>();
+        public DbSet<AssessmentQuestion> AssessmentQuestions => Set<AssessmentQuestion>();
+        public DbSet<CandidateAssessmentAttempt> CandidateAssessmentAttempts => Set<CandidateAssessmentAttempt>();
+        public DbSet<CandidateAssessmentAnswer> CandidateAssessmentAnswers => Set<CandidateAssessmentAnswer>();
 
         protected override void OnModelCreating(ModelBuilder b)
         {

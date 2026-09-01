@@ -28,16 +28,18 @@ namespace IRAS.Application.Modules.Jobs
 
         private readonly IrasDbContext _db;
         private readonly IJdGenerator _jdGenerator;
+        private readonly TemplateJdGenerator _fallbackJdGenerator;
         private readonly IJobMatchingService _matchingService;
         private readonly IFileStorage _storage;
         private readonly ILogger<JobService> _logger;
 
         public JobService(
-            IrasDbContext db, IJdGenerator jdGenerator, IJobMatchingService matchingService,
-            IFileStorage storage, ILogger<JobService> logger)
+            IrasDbContext db, IJdGenerator jdGenerator, TemplateJdGenerator fallbackJdGenerator,
+            IJobMatchingService matchingService, IFileStorage storage, ILogger<JobService> logger)
         {
             _db = db;
             _jdGenerator = jdGenerator;
+            _fallbackJdGenerator = fallbackJdGenerator;
             _matchingService = matchingService;
             _storage = storage;
             _logger = logger;
@@ -152,7 +154,8 @@ namespace IRAS.Application.Modules.Jobs
                     EmploymentType = empType,
                     Location = request.Location,
                     ClosingDate = request.ClosingDate,
-                    Status = JobStatus.Draft
+                    Status = JobStatus.Draft,
+                    RequireAssessment = request.RequireAssessment
                 };
                 _db.Jobs.Add(job);
                 await _db.SaveChangesAsync();
@@ -223,6 +226,7 @@ namespace IRAS.Application.Modules.Jobs
                 job.Location = request.Location;
                 job.ClosingDate = request.ClosingDate;
                 job.TemplateKey = request.TemplateKey;
+                job.RequireAssessment = request.RequireAssessment;
 
                 var currentSkills = _db.JobRequiredSkills.Where(rs => rs.JobId == jobId);
                 _db.JobRequiredSkills.RemoveRange(currentSkills);
@@ -340,22 +344,39 @@ namespace IRAS.Application.Modules.Jobs
                 .Select(j => new { j.Skill.SkillName, j.Importance, j.MinYears })
                 .ToListAsync();
 
-            var jd = await _jdGenerator.GenerateAsync(
-                job,
-                skills.Select(s => (s.SkillName, s.Importance.ToString(), s.MinYears)),
-                employer.CompanyName, employer.Description, request.AdditionalNotes);
+            var skillTuples = skills.Select(s => (s.SkillName, s.Importance.ToString(), s.MinYears)).ToList();
+
+            string jd;
+            IJdGenerator usedGenerator;
+            try
+            {
+                jd = await _jdGenerator.GenerateAsync(
+                    job, skillTuples, employer.CompanyName, employer.Description, request.AdditionalNotes);
+                usedGenerator = _jdGenerator;
+            }
+            catch (InvalidOperationException ex)
+            {
+                // A Gemini outage/timeout must never block an employer from generating a JD —
+                // same resilience posture as ApplicationService falling back to plain text when
+                // the skill-gap explainer is unavailable. The employer can still edit/regenerate
+                // once the AI service recovers.
+                _logger.LogWarning(ex, "Gemini JD generation unavailable for job {JobId}; falling back to template", jobId);
+                jd = await _fallbackJdGenerator.GenerateAsync(
+                    job, skillTuples, employer.CompanyName, employer.Description, request.AdditionalNotes);
+                usedGenerator = _fallbackJdGenerator;
+            }
 
             // Store the raw employer input alongside the output
             job.RequirementInput = request.AdditionalNotes;
             job.GeneratedJd = jd;
-            job.IsAiGenerated = _jdGenerator.IsAi;
+            job.IsAiGenerated = usedGenerator.IsAi;
             await _db.SaveChangesAsync();
 
             return new GenerateJdResponse
             {
                 GeneratedJd = jd,
-                IsAiGenerated = _jdGenerator.IsAi,
-                GeneratorUsed = _jdGenerator.Name
+                IsAiGenerated = usedGenerator.IsAi,
+                GeneratorUsed = usedGenerator.Name
             };
         }
 
@@ -470,6 +491,7 @@ namespace IRAS.Application.Modules.Jobs
                 PostedAt = job.PostedAt,
                 ClosingDate = job.ClosingDate,
                 TemplateKey = job.TemplateKey,
+                RequireAssessment = job.RequireAssessment,
                 ApplicationCount = applicationCount,
                 RequiredSkills = job.RequiredSkills.Select(rs => new JobRequiredSkillDto
                 {

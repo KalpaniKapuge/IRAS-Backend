@@ -48,4 +48,6 @@ namespace IRAS.Domain.Enums
 
     public enum CvSectionType { Summary, Skills, Experience, Education, Certifications, Languages, Projects }
     public enum CvReferenceType { Education, Experience, Certification, Skill, Language, Project }
+
+    public enum AssessmentAttemptStatus { InProgress, Completed }
 }

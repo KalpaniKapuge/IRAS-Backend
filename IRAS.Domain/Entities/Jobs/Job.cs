@@ -21,6 +21,7 @@ namespace IRAS.Domain.Entities.Jobs
         public DateTime? PostedAt { get; set; }
         public DateTime? ClosingDate { get; set; }
         public string? TemplateKey { get; set; }           // "modern" | "classic" | "bold" — presentation only, chosen before publish
+        public bool RequireAssessment { get; set; }         // employer's per-job toggle — gates Apply until a skill assessment is completed
 
         public EmployerProfile Employer { get; set; } = null!;
         public ICollection<JobRequiredSkill> RequiredSkills { get; set; } = new List<JobRequiredSkill>();

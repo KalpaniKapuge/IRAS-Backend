@@ -15,25 +15,56 @@ namespace IRAS.Application.Modules.Chat
 
         // Deliberately curated and static rather than derived from free text, so the gate
         // can't be widened by accident (e.g. by knowledge-base prose containing common words).
+        // Baseline vocabulary every role can use — account/platform basics plus enough
+        // shared recruitment terms (job, application, score, interview) that all three
+        // roles legitimately discuss, just from different angles. Role-specific scoring
+        // (IsInScope) layers each role's own vocabulary on top of this.
         private static readonly HashSet<string> DomainVocabulary = new(StringComparer.OrdinalIgnoreCase)
         {
-            "resume", "resumes", "cv", "upload", "uploaded", "parse", "parsed", "parsing",
-            "skill", "skills", "gap", "gaps", "missing",
             "application", "applications", "apply", "applied", "applying",
             "job", "jobs", "vacancy", "vacancies", "position", "positions", "role", "roles",
             "employer", "employers", "company", "companies",
             "candidate", "candidates", "profile", "profiles", "account",
-            "match", "matches", "matching", "matched",
             "score", "scores", "scoring", "rank", "ranking", "ranked",
-            "interview", "interviews", "shortlist", "shortlisted",
-            "feedback", "reject", "rejected", "rejection", "hire", "hired", "hiring",
+            "interview", "interviews",
             "notification", "notifications", "unread", "status", "update", "updates", "progress",
             "register", "registration", "login", "password", "email",
-            "certification", "certifications", "education", "experience", "qualification", "qualifications",
             "chatbot", "chat", "assistant", "platform", "system", "iras",
             "recruitment", "recruiting", "recruiter",
             "requirement", "requirements", "qualify", "qualified", "suitable", "fit",
-            "learn", "improve", "improvement", "advice", "recommend", "recommendation", "help"
+            "help"
+        };
+
+        // Candidate-only vocabulary: resume/CV, skill gaps, learning, and the outcomes of
+        // their own applications.
+        private static readonly HashSet<string> CandidateVocabulary = new(StringComparer.OrdinalIgnoreCase)
+        {
+            "resume", "resumes", "cv", "upload", "uploaded", "parse", "parsed", "parsing",
+            "skill", "skills", "gap", "gaps", "missing",
+            "match", "matches", "matching", "matched",
+            "feedback", "reject", "rejected", "rejection", "hire", "hired", "hiring",
+            "certification", "certifications", "education", "experience", "qualification", "qualifications",
+            "learn", "improve", "improvement", "advice", "recommend", "recommendation"
+        };
+
+        // Employer-only vocabulary: posting/managing jobs and reviewing applicants.
+        private static readonly HashSet<string> EmployerVocabulary = new(StringComparer.OrdinalIgnoreCase)
+        {
+            "post", "posting", "postings", "publish", "published", "draft", "close", "closed",
+            "applicant", "applicants", "shortlist", "shortlisted",
+            "hire", "hired", "hiring", "reject", "rejected", "rejection", "feedback",
+            "description", "template", "generate", "generated",
+            "skill", "skills", "required", "match", "matches", "matching"
+        };
+
+        // Admin-only vocabulary: platform administration, moderation, and oversight.
+        private static readonly HashSet<string> AdminVocabulary = new(StringComparer.OrdinalIgnoreCase)
+        {
+            "user", "users", "activate", "deactivate", "moderation", "moderate",
+            "audit", "log", "logs", "evidence", "review", "reviews", "verify", "verified",
+            "verification", "approve", "approved", "knowledgebase", "article", "articles",
+            "report", "reports", "reporting", "statistic", "statistics", "dashboard",
+            "taxonomy", "resource", "resources"
         };
 
         private static readonly HashSet<string> Stopwords = new(StringComparer.OrdinalIgnoreCase)
@@ -79,6 +110,15 @@ namespace IRAS.Application.Modules.Chat
         // The hard safety net: anything that doesn't touch the domain vocabulary at all is
         // refused outright. This is what blocks "how do I cook rice?" — the same check
         // whether the responder behind it is rule-based or LLM-backed.
-        public static bool IsInScope(HashSet<string> tokens) => tokens.Overlaps(DomainVocabulary);
+        private static readonly IReadOnlyDictionary<string, HashSet<string>> RoleVocabulary = new Dictionary<string, HashSet<string>>
+        {
+            ["Candidate"] = CandidateVocabulary,
+            ["Employer"] = EmployerVocabulary,
+            ["Admin"] = AdminVocabulary,
+        };
+
+        public static bool IsInScope(HashSet<string> tokens, string role) =>
+            tokens.Overlaps(DomainVocabulary)
+            || (RoleVocabulary.TryGetValue(role, out var roleVocab) && tokens.Overlaps(roleVocab));
     }
 }

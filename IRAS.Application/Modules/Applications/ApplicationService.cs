@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using IRAS.Application.Common.Scoring;
 using IRAS.Application.Modules.Applications.DTOs;
+using IRAS.Application.Modules.Assessments;
 using IRAS.Application.Modules.Feedback;
 using IRAS.Application.Modules.SkillGaps;
 using IRAS.Domain.Entities.Applications;
@@ -35,6 +36,7 @@ namespace IRAS.Application.Modules.Applications
             ExperienceMatch = a.ExperienceMatch,
             EducationMatch = a.EducationMatch,
             SemanticSimilarity = a.SemanticSimilarity,
+            AssessmentScore = a.AssessmentScore,
             AppliedAt = a.AppliedAt,
             SkillGaps = a.SkillGaps.Select(g => new SkillGapDto
             {
@@ -52,16 +54,18 @@ namespace IRAS.Application.Modules.Applications
         private readonly IScoringService _scoring;
         private readonly IFeedbackService _feedback;
         private readonly ISkillGapExplainer _skillGapExplainer;
+        private readonly IAssessmentService _assessments;
         private readonly ILogger<ApplicationService> _logger;
 
         public ApplicationService(
             IrasDbContext db, IScoringService scoring, IFeedbackService feedback,
-            ISkillGapExplainer skillGapExplainer, ILogger<ApplicationService> logger)
+            ISkillGapExplainer skillGapExplainer, IAssessmentService assessments, ILogger<ApplicationService> logger)
         {
             _db = db;
             _scoring = scoring;
             _feedback = feedback;
             _skillGapExplainer = skillGapExplainer;
+            _assessments = assessments;
             _logger = logger;
         }
 
@@ -89,6 +93,9 @@ namespace IRAS.Application.Modules.Applications
             if (alreadyApplied)
                 throw new InvalidOperationException("You have already applied to this job.");
 
+            if (job.RequireAssessment && !await _assessments.HasPassedGateAsync(candidateId, request.JobId, ct))
+                throw new InvalidOperationException("Complete the skill assessment for this job before applying.");
+
             var candidateSkillIds = await _db.CandidateSkills
                 .Where(cs => cs.CandidateId == candidateId)
                 .Select(cs => cs.SkillId)
@@ -98,8 +105,9 @@ namespace IRAS.Application.Modules.Applications
             var experienceMatch = _scoring.ComputeExperienceMatch(candidate.TotalExpYears, job.MinExpYears);
             var educationMatch = _scoring.ComputeEducationMatch(candidate.EducationLevel, job.EducationReq);
             var matchSignals = await _scoring.ComputeMatchSignalAsync(candidateId, resume.ParsedText!, job, ct);
+            var assessmentScore = await _assessments.GetScoreAsync(candidateId, request.JobId, ct);
 
-            var totalScore = _scoring.ComputeTotalScore(skillMatch, matchSignals.SemanticSimilarity, matchSignals.MlFitScore);
+            var totalScore = _scoring.ComputeTotalScore(skillMatch, matchSignals.SemanticSimilarity, matchSignals.MlFitScore, assessmentScore);
 
             var application = new AppEntity
             {
@@ -111,7 +119,8 @@ namespace IRAS.Application.Modules.Applications
                 SkillMatch = skillMatch,
                 ExperienceMatch = experienceMatch,
                 EducationMatch = educationMatch,
-                SemanticSimilarity = matchSignals.SemanticSimilarity
+                SemanticSimilarity = matchSignals.SemanticSimilarity,
+                AssessmentScore = assessmentScore
             };
             _db.Applications.Add(application);
             await _db.SaveChangesAsync(ct);
@@ -187,6 +196,7 @@ namespace IRAS.Application.Modules.Applications
                     ExperienceMatch = a.ExperienceMatch,
                     EducationMatch = a.EducationMatch,
                     SemanticSimilarity = a.SemanticSimilarity,
+                    AssessmentScore = a.AssessmentScore,
                     AppliedAt = a.AppliedAt,
                     SkillGaps = a.SkillGaps.Select(g => new SkillGapDto
                     {

@@ -18,9 +18,11 @@ using IRAS.Application.Common.Scoring;
 using IRAS.Application.Data;
 using IRAS.Application.Modules.Admin;
 using IRAS.Application.Modules.Applications;
+using IRAS.Application.Modules.Assessments;
 using IRAS.Application.Modules.Auth;
 using IRAS.Application.Modules.Candidates;
 using IRAS.Application.Modules.Chat;
+using IRAS.Application.Modules.Chat.ContextBuilders;
 using IRAS.Application.Modules.Feedback;
 using IRAS.Application.Modules.Interviews;
 using IRAS.Application.Modules.Jobs;
@@ -104,6 +106,10 @@ builder.Services.AddHttpClient<IJdGenerator, GeminiJdGenerator>((sp, client) =>
     client.BaseAddress = new Uri(opts.BaseUrl);
     client.Timeout = TimeSpan.FromSeconds(60);
 });
+// Registered as itself (not IJdGenerator) — JobService injects this alongside the primary
+// Gemini-backed IJdGenerator and falls back to it at call time on an AI outage/timeout,
+// rather than swapping the DI registration wholesale like the no-API-key-at-startup cases.
+builder.Services.AddScoped<TemplateJdGenerator>();
 
 // Options
 builder.Services.Configure<FileStorageOptions>(
@@ -182,6 +188,25 @@ else
     builder.Services.AddScoped<IEvidenceReviewer, TemplateEvidenceReviewer>();
 }
 
+// Assessment question generation follows the same conditional Gemini/Template pattern —
+// TemplateAssessmentQuestionGenerator keeps the mandatory pre-application quiz working
+// (if generic) when no Gemini key is configured, rather than blocking every apply flow.
+if (geminiConfigured)
+{
+    builder.Services.AddHttpClient<IAssessmentQuestionGenerator, GeminiAssessmentQuestionGenerator>((sp, client) =>
+    {
+        var opts = builder.Configuration.GetSection(GeminiOptions.SectionName).Get<GeminiOptions>()
+            ?? new GeminiOptions();
+        client.BaseAddress = new Uri(opts.BaseUrl);
+        client.Timeout = TimeSpan.FromSeconds(60);
+    });
+}
+else
+{
+    builder.Services.AddScoped<IAssessmentQuestionGenerator, TemplateAssessmentQuestionGenerator>();
+}
+builder.Services.AddScoped<IAssessmentService, AssessmentService>();
+
 builder.Services.AddHttpClient<ISkillGapExplainer, GeminiSkillGapExplainer>((sp, client) =>
 {
     var opts = builder.Configuration.GetSection(GeminiOptions.SectionName).Get<GeminiOptions>()
@@ -219,6 +244,9 @@ builder.Services.AddHttpClient<IChatResponder, GeminiChatResponder>((sp, client)
     client.Timeout = TimeSpan.FromSeconds(60);
 });
 builder.Services.AddScoped<IChatService, ChatService>();
+builder.Services.AddScoped<IChatContextBuilder, CandidateChatContextBuilder>();
+builder.Services.AddScoped<IChatContextBuilder, EmployerChatContextBuilder>();
+builder.Services.AddScoped<IChatContextBuilder, AdminChatContextBuilder>();
 
 builder.Services.AddScoped<IUserManagementService, UserManagementService>();
 builder.Services.AddScoped<IJobModerationService, JobModerationService>();

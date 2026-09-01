@@ -23,7 +23,7 @@ namespace IRAS.Application.Common.Scoring
 
         // mlFitScore is optional: pass null to fall back to the original two-term formula
         // (e.g. MlFitScoreWeight is 0, or the AI service didn't return a fit score).
-        decimal ComputeTotalScore(decimal skillMatch, decimal semanticSimilarity, decimal? mlFitScore = null);
+        decimal ComputeTotalScore(decimal skillMatch, decimal semanticSimilarity, decimal? mlFitScore = null, decimal? assessmentScore = null);
 
         Task<MatchSignals> ComputeMatchSignalAsync(int candidateId, string resumeText, Job job, CancellationToken ct);
 
