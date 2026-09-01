@@ -13,6 +13,11 @@ namespace IRAS.Application.Common.Scoring
             if (Math.Abs(sum - 1.0m) > 0.001m)
                 return ValidateOptionsResult.Fail($"Scoring weights must sum to 1.0 (currently {sum}).");
 
+            var marksSum = options.MarksSkillWeight + options.MarksAssessmentWeight + options.MarksExperienceWeight
+                + options.MarksEducationWeight + options.MarksSemanticWeight;
+            if (Math.Abs(marksSum - 1.0m) > 0.001m)
+                return ValidateOptionsResult.Fail($"Total marks weights must sum to 1.0 (currently {marksSum}).");
+
             if (options.AutoMatchThreshold is < 0 or > 1)
                 return ValidateOptionsResult.Fail("AutoMatchThreshold must be between 0 and 1.");
 

@@ -49,6 +49,15 @@ namespace IRAS.Application.Modules.Applications.DTOs
         public decimal EducationMatch { get; set; }
         public decimal SemanticSimilarity { get; set; }
         public decimal? AssessmentScore { get; set; }
+
+        // The employer-facing headline figure — see IScoringService.ComputeTotalMarks.
+        // Deliberately distinct from TotalScore: only combines signals visible in the UI
+        // (skill/experience/education match, resume relevance, assessment score), weighted so
+        // skill match and assessment score dominate.
+        public decimal TotalMarks { get; set; }
+
+        public string ResumeFileUrl { get; set; } = null!;
+        public string ResumeFileFormat { get; set; } = null!;
         public DateTime AppliedAt { get; set; }
         public List<SkillGapDto> SkillGaps { get; set; } = new();
     }

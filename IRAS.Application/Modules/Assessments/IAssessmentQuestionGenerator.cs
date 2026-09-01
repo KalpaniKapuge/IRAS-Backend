@@ -4,7 +4,13 @@ using IRAS.Domain.Enums;
 
 namespace IRAS.Application.Modules.Assessments
 {
-    public record GeneratedQuestion(string QuestionText, List<string> Options, int CorrectOptionIndex, string? SkillName);
+    public record GeneratedQuestion(
+        AssessmentQuestionType QuestionType,
+        string QuestionText,
+        List<string> Options,
+        int CorrectOptionIndex,
+        string? ModelAnswer,
+        string? SkillName);
 
     // Same swappable-strategy shape as IJdGenerator/ISkillPlanGenerator/IEvidenceReviewer:
     // a Gemini-backed implementation plus a deterministic Template fallback so the platform

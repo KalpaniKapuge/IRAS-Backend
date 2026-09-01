@@ -13,6 +13,8 @@ namespace IRAS.Infrastructure.Persistence.Configuration.Assessments
 
             builder.HasKey(a => a.AnswerId);
 
+            builder.Property(a => a.ScoreFraction).HasColumnType("decimal(5,4)");
+
             builder.HasOne(a => a.Attempt).WithMany(t => t.Answers)
                 .HasForeignKey(a => a.AttemptId).OnDelete(DeleteBehavior.Cascade);
 

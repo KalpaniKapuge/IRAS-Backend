@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using IRAS.API.Extensions;
 using IRAS.Application.Modules.Applications;
 using IRAS.Application.Modules.Applications.DTOs;
+using IRAS.Application.Modules.Assessments;
 using IRAS.Application.Modules.Feedback;
 using IRAS.Application.Modules.Feedback.DTOs;
 using IRAS.Application.Modules.Interviews;
@@ -22,12 +23,15 @@ namespace IRAS.API.Controllers
         private readonly IApplicationService _applications;
         private readonly IFeedbackService _feedback;
         private readonly IInterviewService _interviews;
+        private readonly IAssessmentService _assessments;
 
-        public EmployerApplicationsController(IApplicationService applications, IFeedbackService feedback, IInterviewService interviews)
+        public EmployerApplicationsController(
+            IApplicationService applications, IFeedbackService feedback, IInterviewService interviews, IAssessmentService assessments)
         {
             _applications = applications;
             _feedback = feedback;
             _interviews = interviews;
+            _assessments = assessments;
         }
 
         private IActionResult? CheckAccess(int employerId)
@@ -69,6 +73,17 @@ namespace IRAS.API.Controllers
         {
             var deny = CheckAccess(employerId); if (deny != null) return deny;
             return Ok(await _feedback.ReviewAsync(employerId, applicationId, request, ct));
+        }
+
+        // Skill-assessment review — the quiz that was generated for this job's role/required
+        // skills, alongside exactly what this candidate answered. 404 if they never completed
+        // one (job doesn't require an assessment, or they haven't finished it yet).
+        [HttpGet("{applicationId:int}/assessment")]
+        public async Task<IActionResult> GetAssessmentReview(int employerId, int jobId, int applicationId, CancellationToken ct)
+        {
+            var deny = CheckAccess(employerId); if (deny != null) return deny;
+            var review = await _assessments.GetReviewForEmployerAsync(employerId, applicationId, ct);
+            return review is null ? NotFound() : Ok(review);
         }
 
         // ---- Interview scheduling ----

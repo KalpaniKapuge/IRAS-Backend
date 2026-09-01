@@ -11,14 +11,17 @@ namespace IRAS.Application.Modules.Assessments
     public class AssessmentService : IAssessmentService
     {
         private const int QuestionCount = 10;
+        private const int SecondsPerQuestion = 60;
 
         private readonly IrasDbContext _db;
         private readonly IAssessmentQuestionGenerator _generator;
+        private readonly IAssessmentAnswerGrader _answerGrader;
 
-        public AssessmentService(IrasDbContext db, IAssessmentQuestionGenerator generator)
+        public AssessmentService(IrasDbContext db, IAssessmentQuestionGenerator generator, IAssessmentAnswerGrader answerGrader)
         {
             _db = db;
             _generator = generator;
+            _answerGrader = answerGrader;
         }
 
         public async Task<AssessmentStatusDto> GetStatusAsync(int candidateId, int jobId, CancellationToken ct)
@@ -30,14 +33,18 @@ namespace IRAS.Application.Modules.Assessments
                 return new AssessmentStatusDto { RequireAssessment = false };
 
             var attempt = await _db.CandidateAssessmentAttempts
+                .Include(a => a.JobAssessment).ThenInclude(ja => ja.Questions)
                 .FirstOrDefaultAsync(a => a.CandidateId == candidateId && a.JobId == jobId, ct);
+
+            var isCompleted = attempt?.Status == AssessmentAttemptStatus.Completed;
 
             return new AssessmentStatusDto
             {
                 RequireAssessment = true,
                 HasAttempted = attempt is not null,
-                IsCompleted = attempt?.Status == AssessmentAttemptStatus.Completed,
-                Score = attempt?.Status == AssessmentAttemptStatus.Completed ? attempt.Score : null,
+                IsCompleted = isCompleted,
+                Score = isCompleted ? attempt!.Score : null,
+                DeadlineAt = attempt is { Status: AssessmentAttemptStatus.InProgress } ? ComputeDeadline(attempt) : null,
             };
         }
 
@@ -63,6 +70,8 @@ namespace IRAS.Application.Modules.Assessments
                 return new StartAssessmentResponse
                 {
                     AttemptId = existing.AttemptId,
+                    StartedAt = existing.StartedAt,
+                    DeadlineAt = ComputeDeadline(existing),
                     Questions = ToCandidateDtos(existing.JobAssessment.Questions),
                 };
             }
@@ -81,6 +90,8 @@ namespace IRAS.Application.Modules.Assessments
             return new StartAssessmentResponse
             {
                 AttemptId = attempt.AttemptId,
+                StartedAt = attempt.StartedAt,
+                DeadlineAt = attempt.StartedAt.AddSeconds(assessment.Questions.Count * SecondsPerQuestion),
                 Questions = ToCandidateDtos(assessment.Questions),
             };
         }
@@ -96,37 +107,68 @@ namespace IRAS.Application.Modules.Assessments
                 throw new InvalidOperationException("This assessment has already been submitted.");
 
             var questions = attempt.JobAssessment.Questions.ToDictionary(q => q.AssessmentQuestionId);
-            var answeredIds = request.Answers.Select(a => a.QuestionId).ToHashSet();
-            if (!questions.Keys.All(answeredIds.Contains))
-                throw new ArgumentException("Answer all questions before submitting.");
+            var answersByQuestionId = request.Answers
+                .Where(a => questions.ContainsKey(a.QuestionId))
+                .ToDictionary(a => a.QuestionId);
 
             var correctCount = 0;
-            foreach (var answer in request.Answers)
-            {
-                if (!questions.TryGetValue(answer.QuestionId, out var question))
-                    throw new ArgumentException("One or more answers reference a question that isn't part of this assessment.");
+            var answeredCount = 0;
+            var totalScoreFraction = 0m;
 
-                var isCorrect = answer.SelectedOptionIndex == question.CorrectOptionIndex;
-                if (isCorrect) correctCount++;
+            // Grade every question the assessment has, not just the ones answered — a
+            // partial/empty submission (the timer ran out) is valid, and unanswered
+            // questions simply score 0. This is the "close the quiz and show marks for what
+            // was done" behavior.
+            foreach (var question in questions.Values.OrderBy(q => q.QuestionOrder))
+            {
+                answersByQuestionId.TryGetValue(question.AssessmentQuestionId, out var answer);
+
+                decimal scoreFraction;
+                int? selectedOptionIndex = null;
+                string? freeTextAnswer = null;
+
+                if (question.QuestionType == AssessmentQuestionType.MultipleChoice)
+                {
+                    selectedOptionIndex = answer?.SelectedOptionIndex;
+                    scoreFraction = selectedOptionIndex.HasValue && selectedOptionIndex == question.CorrectOptionIndex ? 1m : 0m;
+                    if (selectedOptionIndex.HasValue) answeredCount++;
+                }
+                else
+                {
+                    freeTextAnswer = answer?.FreeTextAnswer;
+                    if (!string.IsNullOrWhiteSpace(freeTextAnswer))
+                    {
+                        answeredCount++;
+                        scoreFraction = await _answerGrader.GradeAsync(question.QuestionText, question.ModelAnswer ?? "", freeTextAnswer, ct);
+                    }
+                    else
+                    {
+                        scoreFraction = 0m;
+                    }
+                }
+
+                if (scoreFraction >= 0.6m) correctCount++;
+                totalScoreFraction += scoreFraction;
 
                 _db.CandidateAssessmentAnswers.Add(new CandidateAssessmentAnswer
                 {
                     AttemptId = attempt.AttemptId,
                     AssessmentQuestionId = question.AssessmentQuestionId,
-                    SelectedOptionIndex = answer.SelectedOptionIndex,
-                    IsCorrect = isCorrect,
+                    SelectedOptionIndex = selectedOptionIndex,
+                    FreeTextAnswer = freeTextAnswer,
+                    ScoreFraction = scoreFraction,
                 });
             }
 
             var total = questions.Count;
-            var score = total == 0 ? 0m : Math.Round((decimal)correctCount / total, 4);
+            var score = total == 0 ? 0m : Math.Round(totalScoreFraction / total, 4);
 
             attempt.Status = AssessmentAttemptStatus.Completed;
             attempt.Score = score;
             attempt.CompletedAt = DateTime.UtcNow;
             await _db.SaveChangesAsync(ct);
 
-            return new AssessmentResultDto { Score = score, CorrectCount = correctCount, TotalQuestions = total };
+            return new AssessmentResultDto { Score = score, CorrectCount = correctCount, AnsweredCount = answeredCount, TotalQuestions = total };
         }
 
         public async Task<bool> HasPassedGateAsync(int candidateId, int jobId, CancellationToken ct)
@@ -147,6 +189,50 @@ namespace IRAS.Application.Modules.Assessments
                 .FirstOrDefaultAsync(a => a.CandidateId == candidateId && a.JobId == jobId && a.Status == AssessmentAttemptStatus.Completed, ct);
             return attempt?.Score;
         }
+
+        public async Task<EmployerAssessmentReviewDto?> GetReviewForEmployerAsync(int employerId, int applicationId, CancellationToken ct)
+        {
+            var application = await _db.Applications
+                .FirstOrDefaultAsync(a => a.ApplicationId == applicationId && a.Job.EmployerId == employerId, ct)
+                ?? throw new KeyNotFoundException("Application not found.");
+
+            var attempt = await _db.CandidateAssessmentAttempts
+                .Include(a => a.JobAssessment).ThenInclude(ja => ja.Questions)
+                .Include(a => a.Answers)
+                .FirstOrDefaultAsync(a => a.CandidateId == application.CandidateId && a.JobId == application.JobId
+                    && a.Status == AssessmentAttemptStatus.Completed, ct);
+
+            if (attempt is null) return null;
+
+            var answersByQuestionId = attempt.Answers.ToDictionary(a => a.AssessmentQuestionId);
+
+            return new EmployerAssessmentReviewDto
+            {
+                Score = attempt.Score ?? 0,
+                CompletedAt = attempt.CompletedAt,
+                Questions = attempt.JobAssessment.Questions
+                    .OrderBy(q => q.QuestionOrder)
+                    .Select(q =>
+                    {
+                        answersByQuestionId.TryGetValue(q.AssessmentQuestionId, out var answer);
+                        return new AssessmentQuestionReviewDto
+                        {
+                            QuestionType = q.QuestionType.ToString(),
+                            QuestionText = q.QuestionText,
+                            Options = q.Options,
+                            CorrectOptionIndex = q.QuestionType == AssessmentQuestionType.MultipleChoice ? q.CorrectOptionIndex : null,
+                            ModelAnswer = q.ModelAnswer,
+                            SelectedOptionIndex = answer?.SelectedOptionIndex,
+                            FreeTextAnswer = answer?.FreeTextAnswer,
+                            ScoreFraction = answer?.ScoreFraction ?? 0,
+                        };
+                    })
+                    .ToList(),
+            };
+        }
+
+        private static DateTime ComputeDeadline(CandidateAssessmentAttempt attempt) =>
+            attempt.StartedAt.AddSeconds(attempt.JobAssessment.Questions.Count * SecondsPerQuestion);
 
         private async Task<JobAssessment> GetOrCreateAssessmentAsync(Job job, CancellationToken ct)
         {
@@ -172,9 +258,11 @@ namespace IRAS.Application.Modules.Assessments
                 GeneratedBy = _generator.Name,
                 Questions = generated.Select((q, i) => new AssessmentQuestion
                 {
+                    QuestionType = q.QuestionType,
                     QuestionText = q.QuestionText,
                     Options = q.Options,
                     CorrectOptionIndex = q.CorrectOptionIndex,
+                    ModelAnswer = q.ModelAnswer,
                     QuestionOrder = i,
                     SkillId = q.SkillName is not null && skillIdByName.TryGetValue(q.SkillName, out var skillId) ? skillId : null,
                 }).ToList(),
@@ -190,6 +278,7 @@ namespace IRAS.Application.Modules.Assessments
                 .Select(q => new AssessmentQuestionForCandidateDto
                 {
                     QuestionId = q.AssessmentQuestionId,
+                    QuestionType = q.QuestionType.ToString(),
                     QuestionText = q.QuestionText,
                     Options = q.Options,
                 })

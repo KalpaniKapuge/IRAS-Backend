@@ -205,6 +205,24 @@ else
 {
     builder.Services.AddScoped<IAssessmentQuestionGenerator, TemplateAssessmentQuestionGenerator>();
 }
+
+// Free-text/code answer grading — same conditional pattern; TemplateAssessmentAnswerGrader's
+// keyword-overlap scoring keeps quiz submission gradeable without a Gemini key.
+if (geminiConfigured)
+{
+    builder.Services.AddHttpClient<IAssessmentAnswerGrader, GeminiAssessmentAnswerGrader>((sp, client) =>
+    {
+        var opts = builder.Configuration.GetSection(GeminiOptions.SectionName).Get<GeminiOptions>()
+            ?? new GeminiOptions();
+        client.BaseAddress = new Uri(opts.BaseUrl);
+        client.Timeout = TimeSpan.FromSeconds(60);
+    });
+}
+else
+{
+    builder.Services.AddScoped<IAssessmentAnswerGrader, TemplateAssessmentAnswerGrader>();
+}
+
 builder.Services.AddScoped<IAssessmentService, AssessmentService>();
 
 builder.Services.AddHttpClient<ISkillGapExplainer, GeminiSkillGapExplainer>((sp, client) =>

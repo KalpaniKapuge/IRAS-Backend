@@ -25,6 +25,15 @@ namespace IRAS.Application.Common.Scoring
         // (e.g. MlFitScoreWeight is 0, or the AI service didn't return a fit score).
         decimal ComputeTotalScore(decimal skillMatch, decimal semanticSimilarity, decimal? mlFitScore = null, decimal? assessmentScore = null);
 
+        // "Total marks" — the employer-facing headline figure on the applicant list. Unlike
+        // ComputeTotalScore, this only ever combines signals the employer can see broken out
+        // in the UI (never the opaque MlFitScore), weighted so skill match and assessment
+        // score (the two signals that actually verify a candidate's claimed skills) dominate
+        // over experience/education. Always returns 0..1, renormalized when assessmentScore
+        // is null so a job with no assessment doesn't get artificially capped.
+        decimal ComputeTotalMarks(
+            decimal skillMatch, decimal experienceMatch, decimal educationMatch, decimal semanticSimilarity, decimal? assessmentScore);
+
         Task<MatchSignals> ComputeMatchSignalAsync(int candidateId, string resumeText, Job job, CancellationToken ct);
 
         // Batch form: one HTTP round-trip to the AI service for many candidates against a

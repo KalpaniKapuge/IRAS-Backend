@@ -50,4 +50,5 @@ namespace IRAS.Domain.Enums
     public enum CvReferenceType { Education, Experience, Certification, Skill, Language, Project }
 
     public enum AssessmentAttemptStatus { InProgress, Completed }
+    public enum AssessmentQuestionType { MultipleChoice, FreeText }
 }

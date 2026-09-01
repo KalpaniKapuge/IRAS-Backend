@@ -61,6 +61,28 @@ namespace IRAS.Application.Common.Scoring
             return Math.Round(score, 4);
         }
 
+        public decimal ComputeTotalMarks(
+            decimal skillMatch, decimal experienceMatch, decimal educationMatch, decimal semanticSimilarity, decimal? assessmentScore)
+        {
+            var weightedSum = _options.MarksSkillWeight * skillMatch
+                + _options.MarksExperienceWeight * experienceMatch
+                + _options.MarksEducationWeight * educationMatch
+                + _options.MarksSemanticWeight * semanticSimilarity;
+            var weightUsed = _options.MarksSkillWeight + _options.MarksExperienceWeight
+                + _options.MarksEducationWeight + _options.MarksSemanticWeight;
+
+            if (assessmentScore.HasValue)
+            {
+                weightedSum += _options.MarksAssessmentWeight * assessmentScore.Value;
+                weightUsed += _options.MarksAssessmentWeight;
+            }
+
+            // weightUsed can't be 0 in practice (ScoringOptionsValidator requires the marks
+            // weights to sum to 1, so at least the non-assessment ones are always > 0), but
+            // guard anyway rather than risk a divide-by-zero from a future config change.
+            return weightUsed <= 0 ? 0m : Math.Round(weightedSum / weightUsed, 4);
+        }
+
         public async Task<MatchSignals> ComputeMatchSignalAsync(int candidateId, string resumeText, Job job, CancellationToken ct)
         {
             var results = await ComputeMatchSignalsAsync(job, new[] { (candidateId, resumeText) }, ct);

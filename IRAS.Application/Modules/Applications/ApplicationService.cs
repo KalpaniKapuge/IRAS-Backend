@@ -2,6 +2,8 @@
 using System.Linq.Expressions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using IRAS.Application.Common.Options;
 using IRAS.Application.Common.Scoring;
 using IRAS.Application.Modules.Applications.DTOs;
 using IRAS.Application.Modules.Assessments;
@@ -55,17 +57,20 @@ namespace IRAS.Application.Modules.Applications
         private readonly IFeedbackService _feedback;
         private readonly ISkillGapExplainer _skillGapExplainer;
         private readonly IAssessmentService _assessments;
+        private readonly FileStorageOptions _fileStorageOptions;
         private readonly ILogger<ApplicationService> _logger;
 
         public ApplicationService(
             IrasDbContext db, IScoringService scoring, IFeedbackService feedback,
-            ISkillGapExplainer skillGapExplainer, IAssessmentService assessments, ILogger<ApplicationService> logger)
+            ISkillGapExplainer skillGapExplainer, IAssessmentService assessments, IOptions<FileStorageOptions> fileStorageOptions,
+            ILogger<ApplicationService> logger)
         {
             _db = db;
             _scoring = scoring;
             _feedback = feedback;
             _skillGapExplainer = skillGapExplainer;
             _assessments = assessments;
+            _fileStorageOptions = fileStorageOptions.Value;
             _logger = logger;
         }
 
@@ -182,9 +187,8 @@ namespace IRAS.Application.Modules.Applications
             if (job.EmployerId != employerId)
                 throw new KeyNotFoundException("Job not found.");
 
-            return await _db.Applications
+            var applicants = await _db.Applications
                 .Where(a => a.JobId == jobId)
-                .OrderByDescending(a => a.TotalScore)
                 .Select(a => new RankedApplicantDto
                 {
                     ApplicationId = a.ApplicationId,
@@ -197,6 +201,8 @@ namespace IRAS.Application.Modules.Applications
                     EducationMatch = a.EducationMatch,
                     SemanticSimilarity = a.SemanticSimilarity,
                     AssessmentScore = a.AssessmentScore,
+                    ResumeFileUrl = a.Resume.FileUrl,
+                    ResumeFileFormat = a.Resume.FileFormat.ToString(),
                     AppliedAt = a.AppliedAt,
                     SkillGaps = a.SkillGaps.Select(g => new SkillGapDto
                     {
@@ -207,6 +213,40 @@ namespace IRAS.Application.Modules.Applications
                     }).ToList()
                 })
                 .ToListAsync(ct);
+
+            // TotalMarks/ResumeFileUrl resolution both need real computation (weighted-average
+            // renormalization, file-storage fallback logic) that can't translate to SQL, so
+            // they're filled in after materializing rather than inside the Select above.
+            foreach (var applicant in applicants)
+            {
+                applicant.TotalMarks = _scoring.ComputeTotalMarks(
+                    applicant.SkillMatch, applicant.ExperienceMatch, applicant.EducationMatch,
+                    applicant.SemanticSimilarity, applicant.AssessmentScore);
+                applicant.ResumeFileUrl = ResolveLegacyLocalResumeUrl(applicant.ResumeFileUrl);
+            }
+
+            // Highest "total marks" first — the transparent, employer-auditable figure, not
+            // the opaque weighted TotalScore (see ComputeTotalMarks for why they differ).
+            return applicants.OrderByDescending(a => a.TotalMarks).ToList();
+        }
+
+        // Every resume saved through the currently-registered IFileStorage (Supabase or Local)
+        // already returns a full absolute URL from SaveAsync — so a bare relative FileUrl can
+        // only be a leftover from a local-disk save made before Supabase became the active
+        // provider (or before this guarantee existed at all). Resolving those through whichever
+        // provider happens to be active *today* is wrong: if Supabase is active, it builds a
+        // Supabase object URL for a file that was never uploaded there (404 NoSuchKey), even
+        // though the file is genuinely sitting on local disk and still served at /uploads by
+        // the static file middleware registered in Program.cs. So: already-absolute values are
+        // returned as-is (whichever provider produced them); anything else is unconditionally
+        // resolved against the local uploads route, regardless of the current Provider setting.
+        private string ResolveLegacyLocalResumeUrl(string storedPath)
+        {
+            if (Uri.TryCreate(storedPath, UriKind.Absolute, out _))
+                return storedPath;
+
+            var relative = storedPath.Replace('\\', '/').TrimStart('/');
+            return $"{_fileStorageOptions.LocalPublicBaseUrl.TrimEnd('/')}/uploads/{relative}";
         }
 
         public async Task UpdateStatusAsync(
