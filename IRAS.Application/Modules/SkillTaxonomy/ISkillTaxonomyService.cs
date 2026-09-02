@@ -16,6 +16,11 @@ namespace IRAS.Application.Modules.SkillTaxonomy
         Task UpdateAsync(int adminId, int skillId, UpdateSkillRequest request);
         Task DeleteAsync(int adminId, int skillId);
 
+        // Open to any authenticated role (candidate/employer), unlike CreateAsync — get-or-
+        // create by name so the combobox's "can't find it? add it" flow is idempotent instead
+        // of erroring when two users independently add the same missing skill.
+        Task<SkillDto> QuickAddAsync(int userId, QuickAddSkillRequest request);
+
         Task<SkillAliasDto> AddAliasAsync(int adminId, int skillId, AddAliasRequest request);
         Task DeleteAliasAsync(int adminId, int skillId, int aliasId);
     }

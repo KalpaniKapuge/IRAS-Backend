@@ -28,6 +28,7 @@ namespace IRAS.Domain.Enums
 
     public enum ImportanceLevel { MustHave, NiceToHave }
     public enum EmploymentType { FullTime, PartTime, Contract, Internship, Remote }
+    public enum WorkArrangement { OnSite, Remote, Hybrid }
     public enum JobStatus { Draft, Published, Closed, Archived }
     public enum CompanySize { Startup, Small, Medium, Large, Enterprise }
 

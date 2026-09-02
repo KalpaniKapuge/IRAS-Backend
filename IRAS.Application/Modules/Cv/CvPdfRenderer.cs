@@ -92,10 +92,16 @@ namespace IRAS.Application.Modules.Cv
         // page-bound, but a physical A4 page is a fixed size, so "no wasted space" and "true
         // A4 pages" can only both hold if the whitespace *between* sections/entries grows to
         // actually fill the page. Font sizes are never touched (that would visibly diverge
-        // from the preview) — only spacing/padding is scaled. This renders repeatedly at
-        // increasing scale and keeps the largest one that still fits on a single page; a CV
-        // that already needs >1 page at the tightest spacing is left alone rather than made
-        // worse.
+        // from the preview) — only spacing/padding is scaled.
+        //
+        // How far that needs to go depends entirely on how sparse the CV's content is (no
+        // Summary, one experience entry with no description, etc. can need a much larger
+        // multiplier than a fuller CV to fill the same page) — there's no single safe fixed
+        // ceiling, so this binary-searches for the actual answer instead of guessing one:
+        // first doubles the scale until content overflows to a second page (establishing a
+        // real upper bound for *this* CV), then binary-searches between the last-known-good
+        // and first-known-bad scale to converge on the largest one that still fits exactly
+        // one page. A CV that already needs >1 page at the tightest spacing is left alone.
         public byte[] Render(string templateName, RenderedCvData data)
         {
             byte[] RenderAt(float scale) => templateName switch
@@ -105,14 +111,50 @@ namespace IRAS.Application.Modules.Cv
                 _ => RenderClassic(data, scale), // "Classic" and any unrecognized name
             };
 
-            var best = RenderAt(1f);
+            // At large enough scale, inflated padding around fixed-size elements (e.g. the
+            // circular photo) can make QuestPDF throw DocumentLayoutException instead of just
+            // overflowing to a second page. Any scale that throws is exactly as unusable as one
+            // that overflows, so it's treated identically here — the search backs off rather
+            // than letting the exception escape and turn a cosmetic fit issue into a 500 on CV
+            // download.
+            (byte[]? pdf, int pageCount) TryRenderAt(float scale)
+            {
+                try
+                {
+                    var pdf = RenderAt(scale);
+                    return (pdf, CountPages(pdf));
+                }
+                catch (QuestPDF.Drawing.Exceptions.DocumentLayoutException)
+                {
+                    return (null, int.MaxValue);
+                }
+            }
+
+            var lowScale = 1f;
+            var best = RenderAt(lowScale); // scale 1 is the original, always-safe baseline
             if (CountPages(best) > 1) return best;
 
-            for (var scale = 1.15f; scale <= 2.4f; scale += 0.15f)
+            var highScale = 2f;
+            while (true)
             {
-                var candidate = RenderAt(scale);
-                if (CountPages(candidate) > 1) break;
-                best = candidate;
+                var (_, pageCount) = TryRenderAt(highScale);
+                if (pageCount > 1 || highScale >= 64f) break;
+                highScale *= 2f;
+            }
+
+            for (var i = 0; i < 8; i++)
+            {
+                var mid = (lowScale + highScale) / 2f;
+                var (candidate, pageCount) = TryRenderAt(mid);
+                if (pageCount > 1 || candidate is null)
+                {
+                    highScale = mid;
+                }
+                else
+                {
+                    lowScale = mid;
+                    best = candidate;
+                }
             }
 
             return best;

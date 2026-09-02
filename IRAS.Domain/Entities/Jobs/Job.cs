@@ -16,6 +16,7 @@ namespace IRAS.Domain.Entities.Jobs
         public int MinExpYears { get; set; }
         public EducationLevel EducationReq { get; set; }
         public EmploymentType EmploymentType { get; set; }
+        public WorkArrangement WorkArrangement { get; set; } = WorkArrangement.OnSite;
         public string? Location { get; set; }
         public JobStatus Status { get; set; } = JobStatus.Draft;
         public DateTime? PostedAt { get; set; }

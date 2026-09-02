@@ -149,6 +149,41 @@ namespace IRAS.Application.Modules.SkillTaxonomy
             }
         }
 
+        public async Task<SkillDto> QuickAddAsync(int userId, QuickAddSkillRequest request)
+        {
+            var name = request.SkillName.Trim();
+            if (name.Length == 0)
+                throw new ArgumentException("Skill name cannot be empty.");
+
+            // Get-or-create: someone else may have already added this exact name, or it may
+            // already be a known alias of an existing skill (e.g. typing "ReactJS" when
+            // "React" already exists) — either way, hand back the existing skill instead of
+            // erroring, so the combobox can always treat "add" as "now selectable".
+            var resolved = await ResolveAsync(name);
+            if (resolved.Found)
+                return await GetByIdAsync(resolved.SkillId!.Value);
+
+            var skill = new Skill { SkillName = name, Category = SkillCategory.Other };
+            _db.Skills.Add(skill);
+            try
+            {
+                await _db.SaveChangesAsync();
+            }
+            catch (DbUpdateException)
+            {
+                // Someone else added the exact same name in the gap between the ResolveAsync
+                // check above and this insert — the unique index on SkillName caught it.
+                // Not an error from the caller's point of view: fall back to get.
+                _db.Entry(skill).State = EntityState.Detached;
+                var existing = await _db.Skills.FirstOrDefaultAsync(s => s.SkillName == name);
+                if (existing is null) throw;
+                return await GetByIdAsync(existing.SkillId);
+            }
+
+            await _audit.LogAsync(userId, "SkillQuickAdded", EntityType, skill.SkillId, CancellationToken.None);
+            return await GetByIdAsync(skill.SkillId);
+        }
+
         public async Task UpdateAsync(int adminId, int skillId, UpdateSkillRequest request)
         {
             var skill = await _db.Skills.FirstOrDefaultAsync(s => s.SkillId == skillId)

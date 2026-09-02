@@ -47,6 +47,9 @@ namespace IRAS.Application.Data
                 ("C++", SkillCategory.ProgrammingLanguage, new[]{"CPP", "Cplusplus"}),
                 ("SQL", SkillCategory.ProgrammingLanguage, new[]{"T-SQL", "PL/SQL"}),
                 ("Dart", SkillCategory.ProgrammingLanguage, Array.Empty<string>()),
+                ("HTML", SkillCategory.ProgrammingLanguage, new[]{"HTML5"}),
+                ("CSS", SkillCategory.ProgrammingLanguage, new[]{"CSS3"}),
+                ("Ruby", SkillCategory.ProgrammingLanguage, Array.Empty<string>()),
 
                 // Frameworks
                 ("React", SkillCategory.Framework, new[]{"React.js", "ReactJS"}),
@@ -67,6 +70,9 @@ namespace IRAS.Application.Data
                 ("Tailwind CSS", SkillCategory.Framework, new[]{"TailwindCSS", "Tailwind"}),
                 ("Bootstrap", SkillCategory.Framework, Array.Empty<string>()),
                 (".NET", SkillCategory.Framework, new[]{"dotnet", ".NET Framework"}),
+                ("jQuery", SkillCategory.Framework, Array.Empty<string>()),
+                ("Redux", SkillCategory.Framework, Array.Empty<string>()),
+                ("Ruby on Rails", SkillCategory.Framework, new[]{"Rails"}),
 
                 // Databases
                 ("SQL Server", SkillCategory.Database, new[]{"MSSQL", "Microsoft SQL Server"}),
@@ -100,12 +106,33 @@ namespace IRAS.Application.Data
                 ("TensorFlow", SkillCategory.Tool, Array.Empty<string>()),
                 ("PyTorch", SkillCategory.Tool, Array.Empty<string>()),
                 ("NLP", SkillCategory.Tool, new[]{"Natural Language Processing"}),
+                ("Sass/SCSS", SkillCategory.Tool, new[]{"Sass", "SCSS"}),
+                ("Webpack", SkillCategory.Tool, Array.Empty<string>()),
+                ("Vite", SkillCategory.Tool, Array.Empty<string>()),
+                ("Selenium", SkillCategory.Tool, Array.Empty<string>()),
+                ("Jest", SkillCategory.Tool, Array.Empty<string>()),
+                ("Cypress", SkillCategory.Tool, Array.Empty<string>()),
+                ("Unit Testing", SkillCategory.Tool, new[]{"TDD"}),
+                ("GitHub Actions", SkillCategory.Tool, new[]{"GH Actions"}),
+                ("Terraform", SkillCategory.Tool, Array.Empty<string>()),
+                ("Nginx", SkillCategory.Tool, Array.Empty<string>()),
+                ("Apache Kafka", SkillCategory.Tool, new[]{"Kafka"}),
+                ("RabbitMQ", SkillCategory.Tool, Array.Empty<string>()),
+                ("OAuth 2.0", SkillCategory.Tool, new[]{"OAuth"}),
+                ("JWT", SkillCategory.Tool, new[]{"JSON Web Token"}),
+                ("Photoshop", SkillCategory.Tool, new[]{"Adobe Photoshop"}),
+                ("Illustrator", SkillCategory.Tool, new[]{"Adobe Illustrator"}),
+                ("Adobe XD", SkillCategory.Tool, Array.Empty<string>()),
+                ("UI/UX Design", SkillCategory.Tool, new[]{"UX Design", "UI Design"}),
 
                 // Soft skills
                 ("Agile", SkillCategory.SoftSkill, new[]{"Scrum", "Agile Methodology"}),
                 ("Team Leadership", SkillCategory.SoftSkill, new[]{"Leadership"}),
                 ("Communication", SkillCategory.SoftSkill, Array.Empty<string>()),
                 ("Problem Solving", SkillCategory.SoftSkill, Array.Empty<string>()),
+                ("Project Management", SkillCategory.SoftSkill, Array.Empty<string>()),
+                ("Time Management", SkillCategory.SoftSkill, Array.Empty<string>()),
+                ("Critical Thinking", SkillCategory.SoftSkill, Array.Empty<string>()),
             };
 
             foreach (var (name, cat, aliases) in seed)

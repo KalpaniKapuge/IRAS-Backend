@@ -12,14 +12,22 @@ namespace IRAS.Application.Modules.Resumes.DTOs
         public string? ParseError { get; set; }
         public DateTime UploadedAt { get; set; }
 
+        // Directly fetchable public URL (both LocalDiskFileStorage and SupabaseFileStorage
+        // return one, not a bare filesystem/storage path) — lets the UI open/preview the
+        // actual resume file, not just show its metadata.
+        public string FileUrl { get; set; } = null!;
+
         // The original uploaded file name, or a CV-derived name for resumes generated from
         // the CV builder. Always prefer this over a generic "{FileFormat} Resume" label so
         // several resumes are actually distinguishable in a list.
         public string? FileName { get; set; }
 
         // Non-null only when this resume was generated from a CV-builder CV — lets the UI
-        // show "My Software Engineer CV" instead of a generic "PDF Resume" label. Null both
-        // when it was a direct upload and when the source CV was since deleted.
+        // show "My Software Engineer CV" instead of a generic "PDF Resume" label, and (via
+        // SourceCvId) open the CV's *current* rendering live instead of this resume's frozen
+        // snapshot file. Both null when it was a direct upload or when the source CV was
+        // since deleted.
+        public int? SourceCvId { get; set; }
         public string? SourceCvTitle { get; set; }
     }
 

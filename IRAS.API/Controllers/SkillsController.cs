@@ -39,6 +39,13 @@ namespace IRAS.API.Controllers
         public async Task<IActionResult> Create(CreateSkillRequest request)
             => Ok(await _service.CreateAsync(User.GetUserId(), request));
 
+        // Any signed-in candidate/employer — not admin-gated. Lets the skills combobox
+        // offer "add this skill" the moment a search comes back empty, instead of the
+        // taxonomy only ever growing through manual admin curation.
+        [HttpPost("quick-add")]
+        public async Task<IActionResult> QuickAdd(QuickAddSkillRequest request)
+            => Ok(await _service.QuickAddAsync(User.GetUserId(), request));
+
         [HttpPut("{skillId:int}")]
         [Authorize(Roles = "Admin")]
         public async Task<IActionResult> Update(int skillId, UpdateSkillRequest request)

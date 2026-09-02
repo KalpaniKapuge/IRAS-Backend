@@ -54,7 +54,9 @@ namespace IRAS.Application.Modules.Resumes
                     ParseStatus = r.ParseStatus.ToString(),
                     ParseError = r.ParseError,
                     UploadedAt = r.UploadedAt,
+                    FileUrl = r.FileUrl,
                     FileName = r.FileName,
+                    SourceCvId = r.SourceCvId,
                     SourceCvTitle = r.SourceCv != null ? r.SourceCv.Title : null
                 })
                 .ToListAsync(ct);
@@ -114,6 +116,29 @@ namespace IRAS.Application.Modules.Resumes
                 throw new InvalidOperationException(
                     $"Maximum of {_options.MaxResumesPerCandidate} resumes reached. Delete one first.");
 
+            var rendered = await RenderCvForResumeAsync(candidateId, cvId, ct);
+
+            var resume = new Resume
+            {
+                CandidateId = candidateId,
+                FileUrl = rendered.StoredPath,
+                FileFormat = ResumeFormat.PDF,
+                FileName = rendered.FileName,
+                IsPrimary = resumeCount == 0,
+                ParsedText = rendered.ParsedText,
+                ParseStatus = ParseStatus.Parsed,
+                SourceCvId = cvId
+            };
+            _db.Resumes.Add(resume);
+            await _db.SaveChangesAsync(ct);
+
+            return new ParseResultDto { ResumeId = resume.ResumeId, ParseStatus = resume.ParseStatus.ToString() };
+        }
+
+        private readonly record struct RenderedCvForResume(string StoredPath, string FileName, string ParsedText);
+
+        private async Task<RenderedCvForResume> RenderCvForResumeAsync(int candidateId, int cvId, CancellationToken ct)
+        {
             var cv = await _cv.GetCvDetailAsync(candidateId, cvId, ct);       // 404s if not owned
             var pdfBytes = await _cv.RenderPdfAsync(candidateId, cvId, ct);
 
@@ -124,21 +149,7 @@ namespace IRAS.Application.Modules.Resumes
                 storedPath = await _storage.SaveAsync(stream, candidateId.ToString(), storedName, ct);
             }
 
-            var resume = new Resume
-            {
-                CandidateId = candidateId,
-                FileUrl = storedPath,
-                FileFormat = ResumeFormat.PDF,
-                FileName = $"{cv.Title}.pdf",
-                IsPrimary = resumeCount == 0,
-                ParsedText = BuildParsedTextFromCv(cv),
-                ParseStatus = ParseStatus.Parsed,
-                SourceCvId = cvId
-            };
-            _db.Resumes.Add(resume);
-            await _db.SaveChangesAsync(ct);
-
-            return new ParseResultDto { ResumeId = resume.ResumeId, ParseStatus = resume.ParseStatus.ToString() };
+            return new RenderedCvForResume(storedPath, $"{cv.Title}.pdf", BuildParsedTextFromCv(cv));
         }
 
         private static string BuildParsedTextFromCv(CvDetailDto cv)

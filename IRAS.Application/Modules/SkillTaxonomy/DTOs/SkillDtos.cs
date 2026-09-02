@@ -52,6 +52,17 @@ namespace IRAS.Application.Modules.SkillTaxonomy.DTOs
         public string AliasText { get; set; } = null!;
     }
 
+    // Any signed-in user (not just Admin) can submit one of these when their search for a
+    // skill comes up empty — unlike CreateSkillRequest, there's no Category to pick (a
+    // candidate/employer typing a skill name has no reason to know the taxonomy's category
+    // enum), so the service files it under SkillCategory.Other for an admin to reclassify
+    // later if needed.
+    public class QuickAddSkillRequest
+    {
+        [Required, StringLength(100)]
+        public string SkillName { get; set; } = null!;
+    }
+
     // Result of normalization lookup: "JS" -> JavaScript (skillId 12)
     public class SkillResolveResult
     {

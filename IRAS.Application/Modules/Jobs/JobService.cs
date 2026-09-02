@@ -126,6 +126,7 @@ namespace IRAS.Application.Modules.Jobs
 
             var edu = ParseEnum<EducationLevel>(request.EducationReq, nameof(request.EducationReq));
             var empType = ParseEnum<EmploymentType>(request.EmploymentType, nameof(request.EmploymentType));
+            var workArrangement = ParseEnum<WorkArrangement>(request.WorkArrangement, nameof(request.WorkArrangement));
             if (request.ClosingDate.HasValue && request.ClosingDate.Value.Date <= DateTime.UtcNow.Date)
                 throw new ArgumentException("Closing date must be in the future.");
 
@@ -152,6 +153,7 @@ namespace IRAS.Application.Modules.Jobs
                     MinExpYears = request.MinExpYears,
                     EducationReq = edu,
                     EmploymentType = empType,
+                    WorkArrangement = workArrangement,
                     Location = request.Location,
                     ClosingDate = request.ClosingDate,
                     Status = JobStatus.Draft,
@@ -194,6 +196,7 @@ namespace IRAS.Application.Modules.Jobs
 
             var edu = ParseEnum<EducationLevel>(request.EducationReq, nameof(request.EducationReq));
             var empType = ParseEnum<EmploymentType>(request.EmploymentType, nameof(request.EmploymentType));
+            var workArrangement = ParseEnum<WorkArrangement>(request.WorkArrangement, nameof(request.WorkArrangement));
             if (request.ClosingDate.HasValue && request.ClosingDate.Value.Date <= DateTime.UtcNow.Date)
                 throw new ArgumentException("Closing date must be in the future.");
 
@@ -223,6 +226,7 @@ namespace IRAS.Application.Modules.Jobs
                 job.MinExpYears = request.MinExpYears;
                 job.EducationReq = edu;
                 job.EmploymentType = empType;
+                job.WorkArrangement = workArrangement;
                 job.Location = request.Location;
                 job.ClosingDate = request.ClosingDate;
                 job.TemplateKey = request.TemplateKey;
@@ -295,6 +299,7 @@ namespace IRAS.Application.Modules.Jobs
                     CompanyName = j.Employer.CompanyName,
                     SeniorityLevel = j.SeniorityLevel,
                     EmploymentType = j.EmploymentType.ToString(),
+                    WorkArrangement = j.WorkArrangement.ToString(),
                     Location = j.Location, Status = j.Status.ToString(),
                     PostedAt = j.PostedAt, ClosingDate = j.ClosingDate,
                     TemplateKey = j.TemplateKey,
@@ -322,6 +327,7 @@ namespace IRAS.Application.Modules.Jobs
                     CompanyName = j.Employer.CompanyName,
                     SeniorityLevel = j.SeniorityLevel,
                     EmploymentType = j.EmploymentType.ToString(),
+                    WorkArrangement = j.WorkArrangement.ToString(),
                     Location = j.Location, Status = j.Status.ToString(),
                     PostedAt = j.PostedAt, ClosingDate = j.ClosingDate,
                     TemplateKey = j.TemplateKey,
@@ -486,6 +492,7 @@ namespace IRAS.Application.Modules.Jobs
                 MinExpYears = job.MinExpYears,
                 EducationReq = job.EducationReq.ToString(),
                 EmploymentType = job.EmploymentType.ToString(),
+                WorkArrangement = job.WorkArrangement.ToString(),
                 Location = job.Location,
                 Status = job.Status.ToString(),
                 PostedAt = job.PostedAt,

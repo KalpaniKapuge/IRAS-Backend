@@ -69,6 +69,9 @@ namespace IRAS.Application.Modules.Jobs.DTOs
         [Required]
         public string EmploymentType { get; set; } = null!;
 
+        [Required]
+        public string WorkArrangement { get; set; } = null!;
+
         [StringLength(150)]
         public string? Location { get; set; }
 
@@ -122,6 +125,9 @@ namespace IRAS.Application.Modules.Jobs.DTOs
         [Required]
         public string EmploymentType { get; set; } = null!;
 
+        [Required]
+        public string WorkArrangement { get; set; } = null!;
+
         [StringLength(150)]
         public string? Location { get; set; }
 
@@ -149,6 +155,7 @@ namespace IRAS.Application.Modules.Jobs.DTOs
         public int MinExpYears { get; set; }
         public string EducationReq { get; set; } = null!;
         public string EmploymentType { get; set; } = null!;
+        public string WorkArrangement { get; set; } = null!;
         public string? Location { get; set; }
         public string Status { get; set; } = null!;
         public DateTime? PostedAt { get; set; }
@@ -166,6 +173,7 @@ namespace IRAS.Application.Modules.Jobs.DTOs
         public string? CompanyName { get; set; }
         public string SeniorityLevel { get; set; } = null!;
         public string EmploymentType { get; set; } = null!;
+        public string WorkArrangement { get; set; } = null!;
         public string? Location { get; set; }
         public string Status { get; set; } = null!;
         public DateTime? PostedAt { get; set; }
