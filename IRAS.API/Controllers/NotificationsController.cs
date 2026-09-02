@@ -28,5 +28,12 @@ namespace IRAS.API.Controllers
             await _service.MarkAsReadAsync(User.GetUserId(), notificationId, ct);
             return NoContent();
         }
+
+        [HttpDelete("{notificationId:int}")]
+        public async Task<IActionResult> Delete(int notificationId, CancellationToken ct)
+        {
+            await _service.DeleteAsync(User.GetUserId(), notificationId, ct);
+            return NoContent();
+        }
     }
 }

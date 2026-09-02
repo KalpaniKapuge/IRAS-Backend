@@ -15,5 +15,7 @@ namespace IRAS.Application.Common.Notifications
         Task<List<NotificationDto>> GetMyNotificationsAsync(int userId, CancellationToken ct);
 
         Task MarkAsReadAsync(int userId, int notificationId, CancellationToken ct);
+
+        Task DeleteAsync(int userId, int notificationId, CancellationToken ct);
     }
 }

@@ -71,5 +71,16 @@ namespace IRAS.Application.Common.Notifications
             notification.IsRead = true;
             await _db.SaveChangesAsync(ct);
         }
+
+        public async Task DeleteAsync(int userId, int notificationId, CancellationToken ct)
+        {
+            // Scoped to the caller's own notifications, so one user can't delete another's.
+            var notification = await _db.Notifications
+                .FirstOrDefaultAsync(n => n.NotificationId == notificationId && n.UserId == userId, ct)
+                ?? throw new KeyNotFoundException("Notification not found.");
+
+            _db.Notifications.Remove(notification);
+            await _db.SaveChangesAsync(ct);
+        }
     }
 }
