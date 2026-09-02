@@ -54,6 +54,7 @@ namespace IRAS.Application.Modules.Resumes
                     ParseStatus = r.ParseStatus.ToString(),
                     ParseError = r.ParseError,
                     UploadedAt = r.UploadedAt,
+                    FileName = r.FileName,
                     SourceCvTitle = r.SourceCv != null ? r.SourceCv.Title : null
                 })
                 .ToListAsync(ct);
@@ -84,6 +85,7 @@ namespace IRAS.Application.Modules.Resumes
                 CandidateId = candidateId,
                 FileUrl = storedPath,
                 FileFormat = format,
+                FileName = SanitizeDisplayFileName(file.FileName),
                 IsPrimary = resumeCount == 0,   // first upload becomes primary
                 ParseStatus = ParseStatus.Pending
             };
@@ -127,6 +129,7 @@ namespace IRAS.Application.Modules.Resumes
                 CandidateId = candidateId,
                 FileUrl = storedPath,
                 FileFormat = ResumeFormat.PDF,
+                FileName = $"{cv.Title}.pdf",
                 IsPrimary = resumeCount == 0,
                 ParsedText = BuildParsedTextFromCv(cv),
                 ParseStatus = ParseStatus.Parsed,
@@ -340,6 +343,16 @@ namespace IRAS.Application.Modules.Resumes
                 throw new ArgumentException("File content does not match its extension.");
 
             return declared;
+        }
+
+        // Some browsers/clients send the full client-side path in IFormFile.FileName (a long-
+        // standing quirk, mostly old IE) rather than just the leaf name — strip any directory
+        // component so what's stored/displayed is always just "resume.pdf", never
+        // "C:\Users\me\Desktop\resume.pdf".
+        private static string SanitizeDisplayFileName(string rawFileName)
+        {
+            var leaf = Path.GetFileName(rawFileName);
+            return leaf.Length > 200 ? leaf[^200..] : leaf;
         }
 
         private async Task EnsureCandidateExistsAsync(int candidateId, CancellationToken ct)
