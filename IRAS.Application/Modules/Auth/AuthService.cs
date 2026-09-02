@@ -1,4 +1,5 @@
 // IRAS.Application/Modules/Auth/AuthService.cs
+using Google.Apis.Auth;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
@@ -54,26 +55,7 @@ namespace IRAS.Application.Modules.Auth
             _db.Users.Add(user);
             await _db.SaveChangesAsync();   // save first to get UserId
 
-            if (role == UserRole.Candidate)
-            {
-                _db.CandidateProfiles.Add(new CandidateProfile
-                {
-                    CandidateId = user.UserId,
-                    FirstName = request.FirstName!,
-                    LastName = request.LastName!,
-                    EducationLevel = EducationLevel.Bachelor,
-                    TotalExpYears = 0
-                });
-            }
-            else if (role == UserRole.Employer)
-            {
-                _db.EmployerProfiles.Add(new EmployerProfile
-                {
-                    EmployerId = user.UserId,
-                    CompanyName = request.CompanyName!,
-                    CompanySize = CompanySize.Small
-                });
-            }
+            AddProfileForRole(user, role, request.FirstName, request.LastName, request.CompanyName);
             await _db.SaveChangesAsync();
 
             var response = BuildAuthResponse(user);
@@ -84,7 +66,13 @@ namespace IRAS.Application.Modules.Auth
         public async Task<AuthResponse> LoginAsync(LoginRequest request)
         {
             var user = await _db.Users.FirstOrDefaultAsync(u => u.Email == request.Email);
-            if (user == null || !BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash))
+
+            if (user is { PasswordHash: null })
+                throw new UnauthorizedAccessException(
+                    "This account was created with Google. Use \"Continue with Google\" to sign in.");
+
+            if (user == null || user.PasswordHash == null
+                || !BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash))
                 throw new UnauthorizedAccessException("Invalid email or password.");
 
             if (!user.IsActive)
@@ -94,6 +82,103 @@ namespace IRAS.Application.Modules.Auth
             await _db.SaveChangesAsync();
 
             return BuildAuthResponse(user);
+        }
+
+        public async Task<AuthResponse> GoogleLoginAsync(GoogleLoginRequest request)
+        {
+            var clientId = _config["Authentication:Google:ClientId"];
+            if (string.IsNullOrWhiteSpace(clientId))
+                throw new InvalidOperationException(
+                    "Google sign-in is not configured on the server (Authentication:Google:ClientId).");
+
+            GoogleJsonWebSignature.Payload payload;
+            try
+            {
+                payload = await GoogleJsonWebSignature.ValidateAsync(
+                    request.IdToken,
+                    new GoogleJsonWebSignature.ValidationSettings { Audience = new[] { clientId } });
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                // InvalidJwtException for a bad signature / wrong audience / expired token, but
+                // a malformed token string surfaces as JsonReaderException / FormatException /
+                // ArgumentException from the parser — all mean "this token isn't usable".
+                throw new UnauthorizedAccessException("Google sign-in could not be verified. Please try again.");
+            }
+
+            if (!payload.EmailVerified || string.IsNullOrWhiteSpace(payload.Email))
+                throw new UnauthorizedAccessException("Your Google account has no verified email address.");
+
+            var email = payload.Email.Trim();
+            var user = await _db.Users.FirstOrDefaultAsync(u => u.Email == email);
+
+            if (user != null)
+            {
+                if (!user.IsActive)
+                    throw new UnauthorizedAccessException("This account has been deactivated.");
+
+                user.LastLogin = DateTime.UtcNow;
+                await _db.SaveChangesAsync();
+                return BuildAuthResponse(user);
+            }
+
+            // First sign-in for this Google account — create it. The register page passes the
+            // chosen role; the login page doesn't, so default to Candidate.
+            var role = string.IsNullOrWhiteSpace(request.Role)
+                ? UserRole.Candidate
+                : ParseEnum<UserRole>(request.Role, nameof(request.Role));
+            if (role == UserRole.Admin)
+                throw new InvalidOperationException("Admin accounts cannot be self-registered.");
+
+            var firstName = string.IsNullOrWhiteSpace(payload.GivenName) ? "New" : payload.GivenName.Trim();
+            var lastName = string.IsNullOrWhiteSpace(payload.FamilyName) ? "User" : payload.FamilyName.Trim();
+            var companyName = string.IsNullOrWhiteSpace(payload.Name) ? email : payload.Name.Trim();
+
+            var newUser = new User
+            {
+                Email = email,
+                PasswordHash = null,
+                AuthProvider = "Google",
+                Role = role,
+                IsActive = true,
+                LastLogin = DateTime.UtcNow
+            };
+
+            await using var transaction = await _db.Database.BeginTransactionAsync();
+
+            _db.Users.Add(newUser);
+            await _db.SaveChangesAsync();
+
+            AddProfileForRole(newUser, role, firstName, lastName, companyName);
+            await _db.SaveChangesAsync();
+
+            var response = BuildAuthResponse(newUser);
+            await transaction.CommitAsync();
+            return response;
+        }
+
+        private void AddProfileForRole(User user, UserRole role, string? firstName, string? lastName, string? companyName)
+        {
+            if (role == UserRole.Candidate)
+            {
+                _db.CandidateProfiles.Add(new CandidateProfile
+                {
+                    CandidateId = user.UserId,
+                    FirstName = firstName!,
+                    LastName = lastName!,
+                    EducationLevel = EducationLevel.Bachelor,
+                    TotalExpYears = 0
+                });
+            }
+            else if (role == UserRole.Employer)
+            {
+                _db.EmployerProfiles.Add(new EmployerProfile
+                {
+                    EmployerId = user.UserId,
+                    CompanyName = companyName!,
+                    CompanySize = CompanySize.Small
+                });
+            }
         }
 
         private AuthResponse BuildAuthResponse(User user)

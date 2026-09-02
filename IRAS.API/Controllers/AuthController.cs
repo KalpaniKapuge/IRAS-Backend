@@ -42,6 +42,24 @@ namespace IRAS.API.Controllers
             }
         }
 
+        [HttpPost("google")]
+        public async Task<IActionResult> GoogleLogin(GoogleLoginRequest request)
+        {
+            try
+            {
+                var result = await _authService.GoogleLoginAsync(request);
+                return Ok(result);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return Unauthorized(new { message = ex.Message });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+        }
+
         [Authorize]
         [HttpGet("me")]
         public IActionResult Me()

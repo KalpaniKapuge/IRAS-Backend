@@ -207,3 +207,8 @@ E:\Final Year Research Project\backend\IRAS\IRAS.API\bin\Debug\net10.0\runtimes\
 E:\Final Year Research Project\backend\IRAS\IRAS.API\bin\Debug\net10.0\runtimes\win-x64\native\qpdf.dll
 E:\Final Year Research Project\backend\IRAS\IRAS.API\bin\Debug\net10.0\runtimes\win-x86\native\QuestPdfSkia.dll
 E:\Final Year Research Project\backend\IRAS\IRAS.API\bin\Debug\net10.0\runtimes\win-x86\native\qpdf.dll
+E:\Final Year Research Project\backend\IRAS\IRAS.API\bin\Debug\net10.0\Google.Apis.dll
+E:\Final Year Research Project\backend\IRAS\IRAS.API\bin\Debug\net10.0\Google.Apis.Auth.dll
+E:\Final Year Research Project\backend\IRAS\IRAS.API\bin\Debug\net10.0\Google.Apis.Core.dll
+E:\Final Year Research Project\backend\IRAS\IRAS.API\bin\Debug\net10.0\System.Management.dll
+E:\Final Year Research Project\backend\IRAS\IRAS.API\bin\Debug\net10.0\runtimes\win\lib\net7.0\System.Management.dll

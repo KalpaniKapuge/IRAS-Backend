@@ -12,6 +12,8 @@ namespace IRAS.Infrastructure.Persistence.Configuration.Identity
             builder.ToTable("Users", "identity");
 
             builder.HasIndex(u => u.Email).IsUnique();
+
+            builder.Property(u => u.AuthProvider).HasMaxLength(20).HasDefaultValue("Local");
         }
     }
 }
