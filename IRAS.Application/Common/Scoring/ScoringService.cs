@@ -94,17 +94,10 @@ namespace IRAS.Application.Common.Scoring
         {
             if (candidates.Count == 0) return new Dictionary<int, MatchSignals>();
 
-            // Same taxonomy shape/source ResumeService.ParseAndPersistAsync already sends to
-            // /parse-resume — the fit classifier needs it to compute skill-overlap features.
-            var taxonomy = await _db.Skills
-                .Include(s => s.Aliases)
-                .Select(s => new TaxonomyItem(
-                    s.SkillId, s.SkillName, s.Aliases.Select(a => a.AliasText).ToList()))
-                .ToListAsync(ct);
+            var taxonomy = await LoadTaxonomyAsync(ct);
 
-            var jobText = job.GeneratedJd ?? job.RequirementInput ?? job.Title;
             var rankResult = await _ai.RankAsync(
-                jobText,
+                JobText(job),
                 candidates.Select(c => new RankCandidateInput(c.CandidateId, c.ResumeText)).ToList(),
                 taxonomy,
                 ct);
@@ -117,14 +110,63 @@ namespace IRAS.Application.Common.Scoring
 
             var signals = rankResult.Results.ToDictionary(
                 r => r.CandidateId,
-                r => new MatchSignals(
-                    Math.Round(r.SemanticSimilarity, 4),
-                    r.FitScore.HasValue ? Math.Round(r.FitScore.Value, 4) : null));
+                r => ToSignals(r.SemanticSimilarity, r.FitScore));
             // Guarantee every requested candidate has an entry even if the AI service
             // silently dropped one — callers index this dictionary without a TryGetValue.
             foreach (var c in candidates)
                 signals.TryAdd(c.CandidateId, new MatchSignals(0m, null));
             return signals;
         }
+
+        public async Task<Dictionary<int, MatchSignals>> ComputeMatchSignalsForCandidateAsync(
+            int candidateId, string resumeText, IReadOnlyList<Job> jobs, CancellationToken ct)
+        {
+            var result = new Dictionary<int, MatchSignals>();
+            if (jobs.Count == 0) return result;
+
+            // Fetched once for the whole batch — not re-queried per job as the old
+            // per-job ComputeMatchSignalAsync loop did.
+            var taxonomy = await LoadTaxonomyAsync(ct);
+            var candidateInput = new[] { new RankCandidateInput(candidateId, resumeText) };
+
+            // Bounded concurrency: HttpClient is safe to use concurrently, and no database
+            // work happens past this point, so the N job round-trips can overlap.
+            using var gate = new SemaphoreSlim(4);
+            var tasks = jobs.Select(async job =>
+            {
+                await gate.WaitAsync(ct);
+                try
+                {
+                    var rank = await _ai.RankAsync(JobText(job), candidateInput, taxonomy, ct);
+                    var signals = rank.Success && rank.Results.Count > 0
+                        ? ToSignals(rank.Results[0].SemanticSimilarity, rank.Results[0].FitScore)
+                        : new MatchSignals(0m, null);
+                    if (!rank.Success)
+                        _logger.LogWarning("Match signal unavailable for job {JobId}: {Error}", job.JobId, rank.Error);
+                    return (job.JobId, signals);
+                }
+                finally
+                {
+                    gate.Release();
+                }
+            });
+
+            foreach (var (jobId, signals) in await Task.WhenAll(tasks))
+                result[jobId] = signals;
+            return result;
+        }
+
+        // Same taxonomy shape/source ResumeService.ParseAndPersistAsync already sends to
+        // /parse-resume — the fit classifier needs it to compute skill-overlap features.
+        private Task<List<TaxonomyItem>> LoadTaxonomyAsync(CancellationToken ct) =>
+            _db.Skills
+                .Include(s => s.Aliases)
+                .Select(s => new TaxonomyItem(s.SkillId, s.SkillName, s.Aliases.Select(a => a.AliasText).ToList()))
+                .ToListAsync(ct);
+
+        private static string JobText(Job job) => job.GeneratedJd ?? job.RequirementInput ?? job.Title;
+
+        private static MatchSignals ToSignals(decimal semanticSimilarity, decimal? fitScore) =>
+            new(Math.Round(semanticSimilarity, 4), fitScore.HasValue ? Math.Round(fitScore.Value, 4) : null);
     }
 }

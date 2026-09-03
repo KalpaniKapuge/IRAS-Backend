@@ -41,5 +41,13 @@ namespace IRAS.Application.Common.Scoring
         // scoring every opted-in candidate against a newly-published job.
         Task<Dictionary<int, MatchSignals>> ComputeMatchSignalsAsync(
             Job job, IReadOnlyList<(int CandidateId, string ResumeText)> candidates, CancellationToken ct);
+
+        // One candidate against many jobs (the candidate-facing "recommended jobs" view).
+        // The Python /rank contract is job-centric, so this is still one HTTP call per job —
+        // but the skill taxonomy is fetched once (not once per job) and the calls run with
+        // bounded concurrency, so latency is ~ceil(N / concurrency) round-trips, not N.
+        // Returns jobId -> signals; every input job is present in the result.
+        Task<Dictionary<int, MatchSignals>> ComputeMatchSignalsForCandidateAsync(
+            int candidateId, string resumeText, IReadOnlyList<Job> jobs, CancellationToken ct);
     }
 }

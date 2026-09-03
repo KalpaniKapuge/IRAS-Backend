@@ -151,28 +151,26 @@ namespace IRAS.Application.Modules.Matching
                 .Include(j => j.Employer)
                 .ToListAsync(ct);
 
-            var recommendations = new List<JobRecommendationDto>();
-            foreach (var job in jobs)
+            // One taxonomy fetch + bounded-concurrency AI calls for all jobs at once,
+            // instead of a fetch + a call sequentially per job.
+            var signalsByJob = await _scoring.ComputeMatchSignalsForCandidateAsync(
+                candidateId, candidate.ResumeText!, jobs, ct);
+
+            var recommendations = jobs.Select(job =>
             {
                 var skillMatch = _scoring.ComputeSkillMatch(job.RequiredSkills, candidateSkillIds);
-                // One AI-service call per published job — acceptable at prototype scale
-                // (the Python /api/v1/rank contract is job-centric: one job description
-                // against many candidates). A high-volume production deployment would need
-                // a candidate-centric batch endpoint to avoid N sequential HTTP calls here.
-                var signals = await _scoring.ComputeMatchSignalAsync(candidateId, candidate.ResumeText!, job, ct);
-                var matchScore = _scoring.ComputeTotalScore(skillMatch, signals.SemanticSimilarity, signals.MlFitScore);
-
-                recommendations.Add(new JobRecommendationDto
+                var signals = signalsByJob.GetValueOrDefault(job.JobId, new MatchSignals(0m, null));
+                return new JobRecommendationDto
                 {
                     JobId = job.JobId,
                     JobTitle = job.Title,
                     CompanyName = job.Employer.CompanyName,
-                    MatchScore = matchScore,
+                    MatchScore = _scoring.ComputeTotalScore(skillMatch, signals.SemanticSimilarity, signals.MlFitScore),
                     SkillMatch = skillMatch,
                     SemanticSimilarity = signals.SemanticSimilarity,
                     MlFitScore = signals.MlFitScore
-                });
-            }
+                };
+            });
 
             return recommendations.OrderByDescending(r => r.MatchScore).Take(20).ToList();
         }
