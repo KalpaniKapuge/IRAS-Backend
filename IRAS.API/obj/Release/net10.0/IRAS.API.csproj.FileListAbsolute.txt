@@ -212,3 +212,4 @@ E:\Final Year Research Project\backend\IRAS\IRAS.API\obj\Release\net10.0\refint\
 E:\Final Year Research Project\backend\IRAS\IRAS.API\obj\Release\net10.0\IRAS.API.pdb
 E:\Final Year Research Project\backend\IRAS\IRAS.API\obj\Release\net10.0\IRAS.API.genruntimeconfig.cache
 E:\Final Year Research Project\backend\IRAS\IRAS.API\obj\Release\net10.0\ref\IRAS.API.dll
+E:\Final Year Research Project\backend\IRAS\IRAS.API\bin\Release\net10.0\appsettings.Production.json
