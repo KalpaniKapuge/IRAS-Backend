@@ -76,8 +76,11 @@ builder.Services.AddSwaggerGen(options =>
     options.ResolveConflictingActions(apiDescriptions => apiDescriptions.First());
 });
 
-builder.Services.AddDbContext<IrasDbContext>(options =>
-    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+if (!builder.Environment.IsEnvironment("Testing"))
+{
+    builder.Services.AddDbContext<IrasDbContext>(options =>
+        options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+}
 
 // Audit logging (Module 11) — registered early since several admin-only services below
 // depend on it. Needs HttpContext to capture the caller's IP address.
@@ -429,3 +432,5 @@ public class AuthorizeCheckOperationFilter : IOperationFilter
         ];
     }
 }
+
+public partial class Program { }

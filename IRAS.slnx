@@ -3,4 +3,5 @@
   <Project Path="IRAS.Application/IRAS.Application.csproj" />
   <Project Path="IRAS.Domain/IRAS.Domain.csproj" />
   <Project Path="IRAS.Infrastructure/IRAS.Infrastructure.csproj" />
+  <Project Path="IRAS.Tests/IRAS.Tests.csproj" />
 </Solution>

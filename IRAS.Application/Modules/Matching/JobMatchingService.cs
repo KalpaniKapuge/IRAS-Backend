@@ -61,10 +61,14 @@ namespace IRAS.Application.Modules.Matching
                 .ToList();
             if (eligible.Count == 0) return;
 
-            var candidateSkillMap = await _db.CandidateSkills
+            var candidateSkills = await _db.CandidateSkills
                 .Where(cs => eligible.Select(e => e.CandidateId).Contains(cs.CandidateId))
+                .Select(cs => new { cs.CandidateId, cs.SkillId })
+                .ToListAsync(ct);
+
+            var candidateSkillMap = candidateSkills
                 .GroupBy(cs => cs.CandidateId)
-                .ToDictionaryAsync(g => g.Key, g => (IReadOnlyCollection<int>)g.Select(cs => cs.SkillId).ToList(), ct);
+                .ToDictionary(g => g.Key, g => (IReadOnlyCollection<int>)g.Select(cs => cs.SkillId).ToList());
 
             // One batched HTTP call to the AI service for every eligible candidate's resume
             // against this single job — not N sequential calls.
