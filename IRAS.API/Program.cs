@@ -300,14 +300,17 @@ builder.Services.AddAuthentication(options =>
 });
 builder.Services.AddAuthorization();
 
+// Vite dev server ports are always allowed; the deployed frontend origin(s) come from
+// config (Cors:AllowedOrigins in appsettings.Production.json or the host's environment
+// variables) so going live never needs a code change / redeploy just to add a domain.
+var devOrigins = new[] { "http://localhost:5173", "http://localhost:5174", "http://localhost:5175", "http://localhost:5176" };
+var configuredOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];
+var allowedOrigins = devOrigins.Concat(configuredOrigins).Distinct().ToArray();
+
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowFrontend", policy =>
-        // Vite dev server — allow the default port and the next few it falls back to
-        // when 5173 is already taken by another running instance.
-        policy.WithOrigins(
-                  "http://localhost:5173", "http://localhost:5174", "http://localhost:5175", "http://localhost:5176")
-              .AllowAnyHeader().AllowAnyMethod());
+        policy.WithOrigins(allowedOrigins).AllowAnyHeader().AllowAnyMethod());
 });
 
 var app = builder.Build();
@@ -315,6 +318,10 @@ var app = builder.Build();
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<IrasDbContext>();
+    // Applies any pending migrations on startup — needed for hosts like MonsterASP.NET
+    // where there's no separate CI step to run `dotnet ef database update` against the
+    // remote connection string before the app starts.
+    await db.Database.MigrateAsync();
     await DataSeeder.SeedAsync(
         db,
         builder.Configuration["Seed:AdminEmail"] ?? "admin@iras.local",
