@@ -1,0 +1,10 @@
+**/bin
+**/obj
+publish/
+docs/
+scripts/
+VerifyAiConnection/
+IRAS.Tests/
+.git
+.gitignore
+*.md
