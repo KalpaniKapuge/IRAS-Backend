@@ -1,5 +1,6 @@
 // IRAS.Application/Modules/Assessments/AssessmentService.cs
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using IRAS.Application.Modules.Assessments.DTOs;
 using IRAS.Domain.Entities.Assessments;
 using IRAS.Domain.Entities.Jobs;
@@ -15,13 +16,19 @@ namespace IRAS.Application.Modules.Assessments
 
         private readonly IrasDbContext _db;
         private readonly IAssessmentQuestionGenerator _generator;
+        private readonly TemplateAssessmentQuestionGenerator _fallbackGenerator;
         private readonly IAssessmentAnswerGrader _answerGrader;
+        private readonly ILogger<AssessmentService> _logger;
 
-        public AssessmentService(IrasDbContext db, IAssessmentQuestionGenerator generator, IAssessmentAnswerGrader answerGrader)
+        public AssessmentService(
+            IrasDbContext db, IAssessmentQuestionGenerator generator, TemplateAssessmentQuestionGenerator fallbackGenerator,
+            IAssessmentAnswerGrader answerGrader, ILogger<AssessmentService> logger)
         {
             _db = db;
             _generator = generator;
+            _fallbackGenerator = fallbackGenerator;
             _answerGrader = answerGrader;
+            _logger = logger;
         }
 
         public async Task<AssessmentStatusDto> GetStatusAsync(int candidateId, int jobId, CancellationToken ct)
@@ -246,7 +253,28 @@ namespace IRAS.Application.Modules.Assessments
                 .Select(rs => (rs.Skill.SkillName, Importance: rs.Importance.ToString(), rs.Skill.Category))
                 .ToList();
 
-            var generated = await _generator.GenerateAsync(job, skills, QuestionCount, ct);
+            List<GeneratedQuestion> generated;
+            IAssessmentQuestionGenerator usedGenerator;
+            try
+            {
+                generated = await _generator.GenerateAsync(job, skills, QuestionCount, ct);
+                if (generated.Count == 0)
+                    throw new InvalidOperationException("The AI service returned no questions.");
+                usedGenerator = _generator;
+            }
+            catch (Exception ex)
+            {
+                // A Gemini timeout, malformed/truncated response, or rate limit must never
+                // block a candidate from starting (and therefore applying for) a job that
+                // requires this assessment — same resilience posture as JobService falling
+                // back to a template JD on an AI outage. Scoped tightly around just the AI
+                // call, so a real "job not found" failure earlier in this method is never
+                // swallowed by accident.
+                _logger.LogWarning(ex, "AI assessment question generation unavailable for job {JobId}; falling back to template", job.JobId);
+                generated = await _fallbackGenerator.GenerateAsync(job, skills, QuestionCount, ct);
+                usedGenerator = _fallbackGenerator;
+            }
+
             if (generated.Count == 0)
                 throw new InvalidOperationException("Unable to generate a skill assessment for this job. Please try again shortly.");
 
@@ -255,7 +283,7 @@ namespace IRAS.Application.Modules.Assessments
             var assessment = new JobAssessment
             {
                 JobId = job.JobId,
-                GeneratedBy = _generator.Name,
+                GeneratedBy = usedGenerator.Name,
                 Questions = generated.Select((q, i) => new AssessmentQuestion
                 {
                     QuestionType = q.QuestionType,

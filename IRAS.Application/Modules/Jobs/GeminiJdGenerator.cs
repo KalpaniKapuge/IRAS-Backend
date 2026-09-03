@@ -61,21 +61,23 @@ namespace IRAS.Application.Modules.Jobs
         private readonly HttpClient _http;
         private readonly GeminiOptions _options;
         private readonly ILogger<GeminiJdGenerator> _logger;
+        private readonly string? _apiKey;
 
+        // The missing-API-key check used to live here and throw at construction time. That
+        // was a real bug: this generator is constructor-injected into JobService, so DI
+        // activates it (and therefore evaluates this check) before JobService.GenerateJdAsync
+        // ever runs — meaning the exception happened outside that method's try/catch and
+        // bypassed the Template fallback entirely, surfacing as a hard 400 to the employer
+        // instead of a silent, graceful fallback. Deferring the check to GenerateAsync (see
+        // below) lets JobService's catch block do its job as intended.
         public GeminiJdGenerator(HttpClient http, IOptions<GeminiOptions> options, ILogger<GeminiJdGenerator> logger)
         {
             _options = options.Value;
-            var apiKey = string.IsNullOrWhiteSpace(_options.ApiKey)
+            _apiKey = string.IsNullOrWhiteSpace(_options.ApiKey)
                 ? Environment.GetEnvironmentVariable("GEMINI_API_KEY")
                 : _options.ApiKey;
 
-            if (string.IsNullOrWhiteSpace(apiKey))
-                throw new InvalidOperationException(
-                    "No Gemini API key configured. Set Gemini:ApiKey via user-secrets, " +
-                    "or the GEMINI_API_KEY environment variable.");
-
             _http = http;
-            _http.DefaultRequestHeaders.Add("x-goog-api-key", apiKey);
             _logger = logger;
         }
 
@@ -83,6 +85,14 @@ namespace IRAS.Application.Modules.Jobs
             IEnumerable<(string SkillName, string Importance, int MinYears)> skills,
             string companyName, string? companyDescription, string? additionalNotes)
         {
+            if (string.IsNullOrWhiteSpace(_apiKey))
+                throw new InvalidOperationException(
+                    "No Gemini API key configured. Set Gemini:ApiKey via user-secrets, " +
+                    "or the GEMINI_API_KEY environment variable.");
+
+            if (!_http.DefaultRequestHeaders.Contains("x-goog-api-key"))
+                _http.DefaultRequestHeaders.Add("x-goog-api-key", _apiKey);
+
             var userPrompt = BuildUserPrompt(job, skills, companyName, companyDescription, additionalNotes);
 
             // thinking_level "minimal": JD generation is a rewriting/structuring task, not

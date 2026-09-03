@@ -360,13 +360,20 @@ namespace IRAS.Application.Modules.Jobs
                     job, skillTuples, employer.CompanyName, employer.Description, request.AdditionalNotes);
                 usedGenerator = _jdGenerator;
             }
-            catch (InvalidOperationException ex)
+            catch (Exception ex)
             {
-                // A Gemini outage/timeout must never block an employer from generating a JD —
-                // same resilience posture as ApplicationService falling back to plain text when
-                // the skill-gap explainer is unavailable. The employer can still edit/regenerate
-                // once the AI service recovers.
-                _logger.LogWarning(ex, "Gemini JD generation unavailable for job {JobId}; falling back to template", jobId);
+                // A Gemini outage, timeout, missing/invalid API key, or any other AI-side
+                // failure must never block an employer from generating a JD — same resilience
+                // posture as ApplicationService falling back to plain text when the skill-gap
+                // explainer is unavailable. Deliberately catches any exception type here (not
+                // just InvalidOperationException) since this block is scoped tightly around
+                // just the AI call — a "job not found"/ownership failure already happened
+                // earlier in this method, outside this try, so it's never swallowed by
+                // accident. The Template fallback has no external dependencies and cannot
+                // itself fail, so JD generation is now guaranteed to succeed from the
+                // employer's point of view. The employer can still edit/regenerate once the
+                // AI service recovers.
+                _logger.LogWarning(ex, "AI JD generation unavailable for job {JobId}; falling back to template", jobId);
                 jd = await _fallbackJdGenerator.GenerateAsync(
                     job, skillTuples, employer.CompanyName, employer.Description, request.AdditionalNotes);
                 usedGenerator = _fallbackJdGenerator;

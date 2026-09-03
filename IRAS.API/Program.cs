@@ -205,6 +205,10 @@ else
 {
     builder.Services.AddScoped<IAssessmentQuestionGenerator, TemplateAssessmentQuestionGenerator>();
 }
+// Registered as itself (not IAssessmentQuestionGenerator) — AssessmentService injects this
+// alongside the primary generator above and falls back to it at call time on a Gemini
+// timeout/malformed response/rate limit, same resilience pattern as JobService/IJdGenerator.
+builder.Services.AddScoped<TemplateAssessmentQuestionGenerator>();
 
 // Free-text/code answer grading — same conditional pattern; TemplateAssessmentAnswerGrader's
 // keyword-overlap scoring keeps quiz submission gradeable without a Gemini key.
