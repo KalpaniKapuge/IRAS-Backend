@@ -10,3 +10,6 @@ E:\Final Year Research Project\backend\IRAS\IRAS.Domain\obj\Release\net10.0\IRAS
 E:\Final Year Research Project\backend\IRAS\IRAS.Domain\obj\Release\net10.0\refint\IRAS.Domain.dll
 E:\Final Year Research Project\backend\IRAS\IRAS.Domain\obj\Release\net10.0\IRAS.Domain.pdb
 E:\Final Year Research Project\backend\IRAS\IRAS.Domain\obj\Release\net10.0\ref\IRAS.Domain.dll
+E:\Final Year Research Project\backend\IRAS\IRAS.Domain\bin_thesis_test\Release\net10.0\IRAS.Domain.deps.json
+E:\Final Year Research Project\backend\IRAS\IRAS.Domain\bin_thesis_test\Release\net10.0\IRAS.Domain.dll
+E:\Final Year Research Project\backend\IRAS\IRAS.Domain\bin_thesis_test\Release\net10.0\IRAS.Domain.pdb

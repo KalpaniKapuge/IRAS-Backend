@@ -37,6 +37,7 @@ namespace IRAS.Application.Modules.Admin
                     CompanyName = j.Employer.CompanyName,
                     SeniorityLevel = j.SeniorityLevel,
                     EmploymentType = j.EmploymentType.ToString(),
+                    WorkArrangement = j.WorkArrangement.ToString(),
                     Location = j.Location,
                     Status = j.Status.ToString(),
                     PostedAt = j.PostedAt,

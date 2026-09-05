@@ -14,7 +14,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("IRAS.API")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+36a0ee0794027bbd82c2de3ee8059624ca2669df")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+d93732ad0f7b4da26a4c81aff4dfcc65821df082")]
 [assembly: System.Reflection.AssemblyProductAttribute("IRAS.API")]
 [assembly: System.Reflection.AssemblyTitleAttribute("IRAS.API")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

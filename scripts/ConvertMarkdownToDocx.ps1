@@ -62,7 +62,7 @@ try {
     [System.IO.Directory]::CreateDirectory($relsDir) | Out-Null
     [System.IO.Directory]::CreateDirectory($wordDir) | Out-Null
 
-    $lines = Get-Content -LiteralPath $inputFull
+    $lines = Get-Content -LiteralPath $inputFull -Encoding UTF8
     $paragraphs = New-Object System.Collections.Generic.List[string]
 
     foreach ($line in $lines) {
