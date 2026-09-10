@@ -1,0 +1,225 @@
+#C CHAPTER 05 - IMPLEMENTATION / DESIGNING
+
+# 5.1 Implementation Approach
+
+IRAS was implemented incrementally, sprint by sprint, following the Scrum plan set out in Section 3.6. Each sprint targeted one vertical slice of the system — a database migration, the corresponding domain entities, the application-layer service, the API controller, and (where relevant) the AI-service integration — rather than building every layer of the whole system at once. This section elaborates the algorithmic logic behind the system's most significant contribution, the multi-signal scoring pipeline, before covering the AI-assisted skill-gap and evidence-review logic, the technology choices made, and the implementation of the platform's most significant AI-driven features.
+
+## 5.1.1 Algorithms
+
+The core of IRAS's contribution is a scoring algorithm that never depends on a single signal. Four algorithms are described below in pseudocode form, each corresponding to a method that exists in the implemented ScoringService and JobMatchingService.
+
+**Algorithm 1 — Taxonomy-based Skill Match**
+
+CODE:
+function ComputeSkillMatch(requiredSkills, candidateSkillIds):
+    if requiredSkills is empty:
+        return 1.0                          // no requirement -> full match
+    totalWeight = sum(rs.Weight for rs in requiredSkills)
+    if totalWeight <= 0:
+        return 0.0
+    matchedWeight = sum(rs.Weight for rs in requiredSkills
+                         if rs.SkillId in candidateSkillIds)
+    return round(matchedWeight / totalWeight, 4)
+ENDCODE
+
+Each required skill on a job carries a weight (MustHave skills outweigh NiceToHave skills), so a candidate missing one optional skill is scored more favourably than one missing a mandatory skill — a distinction a pure keyword match cannot express.
+
+**Algorithm 2 — Weighted Total Score**
+
+CODE:
+function ComputeTotalScore(skillMatch, semanticSimilarity, mlFitScore = null, assessmentScore = null):
+    score = SkillMatchWeight * skillMatch + SemanticSimilarityWeight * semanticSimilarity
+    if mlFitScore is not null:
+        score += MlFitScoreWeight * mlFitScore
+    if assessmentScore is not null:
+        score += AssessmentScoreWeight * assessmentScore
+    return round(score, 4)
+ENDCODE
+
+The weights are read from configuration (ScoringOptions) rather than hard-coded, so the platform operator can shift emphasis — for example, enabling MlFitScoreWeight once the trained classifier described in Chapter 6 is deployed — without a code change or redeploy.
+
+FIG:scoring_pipeline.png|Figure 5.1|Weighted Scoring Pipeline. The block diagram shows the four independent signals — skill match, semantic similarity, ML fit score, and assessment score — feeding into a single configurable weighted sum, which is then persisted as the Application's or JobMatch's headline score and compared against the auto-match threshold; the asterisked note records that the ML fit-score and assessment-score weights default to zero so existing deployments are unaffected until an operator opts in, even though both signals are still computed and stored.
+
+**Algorithm 3 — Batched Proactive Matching**
+
+CODE:
+function RunMatchingForJobAsync(jobId):
+    job = LoadPublishedJob(jobId)
+    alreadyConsidered = JobMatches where JobId = jobId  -> candidateIds
+    eligible = CandidateProfiles where OptInMatching = true
+               and CandidateId not in alreadyConsidered
+               and has a parsed primary resume
+    if eligible is empty: return
+
+    // one batched HTTP call for every eligible candidate against this job,
+    // not one call per candidate
+    signals = ScoringService.ComputeMatchSignalsAsync(job, eligible)
+
+    for candidate in eligible:
+        skillMatch = ComputeSkillMatch(job.RequiredSkills, candidate.SkillIds)
+        (semanticSimilarity, mlFitScore) = signals[candidate.Id]
+        totalScore = ComputeTotalScore(skillMatch, semanticSimilarity, mlFitScore)
+        passed = totalScore >= AutoMatchThreshold
+        save JobMatch(jobId, candidate.Id, totalScore, passed)
+        if passed: NotifyCandidate(candidate.Id, job)
+ENDCODE
+
+This algorithm is deliberately batched: the naive design would call the AI service once per eligible candidate, which does not scale once a job has hundreds of opted-in candidates to consider. Batching the resumes and job text into a single request to the AI service's ranking endpoint keeps the number of outbound HTTP calls constant with respect to job count rather than linear in candidate count.
+
+**Algorithm 4 — Confidence-gated Evidence Review**
+
+CODE:
+function SubmitEvidenceForReviewAsync(evidenceId):
+    SetStatus(evidenceId, Pending)
+    (recommendation, confidence) = AiEvidenceReviewer.Review(evidence, planStep)
+    if confidence >= AutoApproveThreshold:
+        ApplyDecision(evidenceId, recommendation, source = "AI")
+    else:
+        QueueForAdminReview(evidenceId, recommendation, confidence)
+ENDCODE
+
+Evidence review is not fully automated: only high-confidence AI recommendations are applied directly, and every AI decision — whether auto-applied or queued — is written to the audit log with its confidence value, satisfying NFR-09 and directly addressing the transparency concern raised in Section 4.2.
+
+## 5.1.2 Workflow via Block Diagrams
+
+The scoring pipeline in Figure 5.1 is one of three block-diagram workflows implemented in the system; the other two — the application-shortlisting activity flow and the three sequence diagrams for scoring, resume parsing, and evidence review — were already presented in Section 4.4 as part of the system design and are implemented exactly as diagrammed, without deviation, in the corresponding IRAS.Application services.
+
+## 5.1.3 Technology Selection Justification
+
+TCAP:Table 5.1|Technology Selection Justification.
+| Decision | Options Considered | Selected | Justification |
+| Backend language/runtime | Java + Spring Boot, Node.js + Express, C# + ASP.NET Core | C# / .NET (ASP.NET Core Web API) | Strong typing catches scoring-formula and enum-mismatch errors at compile time; first-class Entity Framework Core ORM; mature JWT and Swagger tooling; team familiarity |
+| AI/ML service language | C# (ML.NET), Python (FastAPI) | Python (FastAPI) | The NLP/ML ecosystem (transformer-based embeddings, scikit-learn-style classifiers) is far more mature in Python than in .NET; isolating it as its own service also lets it scale and fail independently of the API (Section 4.5) |
+| Relational database | SQL Server, MySQL, PostgreSQL | SQL Server | Mature, first-class EF Core provider support; strong tooling fit with the ASP.NET Core/C# stack (SSMS, familiar T-SQL); Supabase is used separately, for object/file storage only, not the relational data |
+| Frontend framework | Angular, Vue, React | React + TypeScript (Vite) | Component reuse across three distinct portals (Candidate/Employer/Admin); large ecosystem; TypeScript catches DTO-shape drift against the C# API contracts |
+| Authentication | Session cookies, OAuth-only, JWT | JWT Bearer | Stateless, natural fit for a decoupled SPA + API architecture, and works uniformly across the three roles via claims-based authorization |
+| Containerization | Bare-metal deploy, Docker | Docker (multi-stage build) | Reproducible builds; Render.com's deployment model expects a container; keeps the Domain/Application/Infrastructure/API project references consistent between dev and prod |
+
+### 5.1.3.1 Programming Language
+
+The backend is implemented in C# targeting .NET, chosen for its static typing, mature async/await support (essential given the number of outbound AI-service calls on the request path), and first-class integration with Entity Framework Core. The AI microservice is implemented in Python, the de facto language for the NLP and machine-learning libraries the ranking and parsing features depend on. The frontend is implemented in TypeScript, chosen over plain JavaScript so that the shape of API request/response DTOs is checked at compile time rather than discovered at runtime.
+
+### 5.1.3.2 Libraries Used
+
+TCAP:Table 5.2|Key Libraries and Their Role.
+| Library | Layer | Role |
+| Entity Framework Core (SQL Server provider) | Infrastructure | Object-relational mapping and SQL Server migrations |
+| Swashbuckle (Swagger/OpenAPI) | API | Interactive API documentation and manual endpoint testing |
+| System.IdentityModel.Tokens.Jwt | API | JWT bearer token issuing and validation |
+| QuestPDF | Application | Server-side CV/PDF document generation |
+| xUnit | Tests | Backend unit and integration testing (IRAS.Tests) |
+| FastAPI + Uvicorn | AI Service | HTTP interface for resume parsing, ranking, and health-check endpoints |
+| A trained scikit-learn-style classifier | AI Service | The candidate-job "Good-Fit" probability consumed as the ML fit-score signal |
+
+### 5.1.3.3 Backend and Frontend Frameworks
+
+The backend follows the layered ASP.NET Core Web API convention described in Section 4.5 (IRAS.API, IRAS.Application, IRAS.Domain, IRAS.Infrastructure as four separate projects referenced in that dependency direction only, enforced by the .csproj references themselves). The frontend is a Vite-built single-page React application that consumes the Web API over HTTPS and renders three distinct route trees for the Candidate, Employer, and Admin roles, gated by the JWT claim carrying the user's role.
+
+# 5.2 Significant Implementation Features
+
+This section elaborates the implementation of the features that carry IRAS's actual research contribution, rather than routine CRUD screens such as login or profile editing, which follow standard ASP.NET Core Identity-style patterns and are not separately discussed here.
+
+**AI-assisted job description generation.** The employer job-posting workflow (FR-11) uses a two-implementation pattern behind a single IJdGenerator interface: a GeminiJdGenerator that calls the configured LLM with the employer's minimal input (title, seniority, required skills, work arrangement) and a TemplateJdGenerator that assembles a structured description from a fixed template when no LLM key is configured or the call fails. The controller always returns the generated draft as editable text rather than publishing it directly — the employer must explicitly approve it, which is the human-in-the-loop control called for in Section 3.6.2's Human Oversight mitigation.
+
+CODE:
+async function GenerateJobDescriptionAsync(request):
+    try:
+        draft = await GeminiJdGenerator.Generate(request)
+    catch (AiServiceException):
+        draft = TemplateJdGenerator.Generate(request)   // deterministic fallback
+    return DraftJobDescriptionDto(draft, source: draft.Source, requiresApproval: true)
+ENDCODE
+
+**Multi-signal candidate ranking.** Described algorithmically in Section 5.1.1; the implementation detail worth highlighting here is that ComputeSkillMatch runs entirely inside the .NET process against the locally cached skill taxonomy, while semantic similarity and the fit-classifier score are the only two values that cross the network boundary to the AI service — keeping the latency-sensitive, purely-relational part of the score computation local, and only paying the network cost for the two signals that genuinely require it.
+
+**Skill-gap explanation and improvement-plan generation.** When an application or profile comparison reveals a skill gap, SkillGapService first computes the gap set deterministically (required skills minus candidate skills, by weight), then passes that gap set — not the raw resume — to an IGap Explainer (Gemini-backed, with a template fallback identical in shape to the JD generator) to produce a plain-language explanation. SkillImprovementPlanService then sequences the gap into an ordered plan of SkillPlanStep records with a target proficiency level and priority, which the candidate works through and submits SkillPlanEvidence against.
+
+**Confidence-gated evidence review.** Described algorithmically as Algorithm 4; the implementation detail is that the AI evidence reviewer's confidence score is persisted alongside its recommendation even when an administrator later overrides it, so the audit log can show not just what decision was made but how confident the AI was when it made (or failed to make) that decision autonomously.
+
+**Role-aware chatbot.** ChatService delegates context construction to one of three ContextBuilder implementations — CandidateChatContextBuilder, EmployerChatContextBuilder, or AdminChatContextBuilder — selected by the authenticated user's role, so that the LLM prompt is only ever populated with data that role is authorized to see. A ChatScopeGate then filters the LLM's response before it reaches the user, rejecting answers that stray outside recruitment-relevant topics, which implements the "Chatbot Misuse" mitigation from Table 3.2.
+
+CODE:
+function BuildAndSendPrompt(user, message):
+    contextBuilder = SelectContextBuilder(user.Role)     // Candidate | Employer | Admin
+    context = contextBuilder.Build(user)                 // only this role's own data
+    reply = ChatResponder.Respond(context, message)       // Gemini, or rule-based fallback
+    if not ChatScopeGate.IsInScope(reply):
+        return FallbackReply("I can only help with recruitment-related questions.")
+    return reply
+ENDCODE
+
+**Resume parsing.** CvService streams the uploaded file to the AI service's /parse-resume endpoint together with the current skill taxonomy, receives back parsed text, detected skills (each tagged with how it was matched — exact alias or learned-from-parsing), emails, phones, and a word count, and persists a Resume and a set of CandidateSkill rows tagged SkillSource.ResumeParsed. The candidate is always shown this extraction as an editable preview before it is treated as authoritative, consistent with the parsing-accuracy limitation noted in Section 2.5.1.
+
+**Error handling and logging strategy.** Every outbound call to the AI service is wrapped so that a timeout, a non-2xx response, or a malformed payload is caught at the AiServiceClient boundary and converted into a typed result object (for example, RankResult.Success = false with an Error message) rather than allowed to propagate as an unhandled exception up through the Application and API layers. This choice was made deliberately after observing, during early integration testing, that an unguarded call would otherwise turn a single slow or unavailable AI-service instance into a cascading 500 error for every candidate awaiting a score, which is precisely the fragility NFR-03 was written to rule out. A central ApiExceptionFilter additionally converts any remaining unhandled exception into a structured JSON error response rather than a raw stack trace, and every AI-service failure, admin action, and evidence-review decision is written through a shared logging path so that Section 6.3's audit-trail evidence and Chapter 4's NFR-09 requirement are backed by the same underlying mechanism rather than two separate, potentially inconsistent implementations.
+
+# 5.3 Implementation Evidence: System User Interface
+
+This section documents the running system's user interface, screen by screen, as built — it is evidence that the requirements and workflows specified in Chapter 4 exist as working software, not only as diagrams. Pages are shown exactly as implemented, grouped by the three portals introduced in Section 1.8 (Candidate, Employer, Administrator), with each screenshot tied back to the use case or functional requirement it satisfies. Purely administrative CRUD screens that carry no distinct logic of their own (e.g. an ordinary edit form) are still included here for completeness, even though — consistent with Section 5.2's scoping note — they were not separately discussed as implementation *features*.
+
+## 5.3.1 Candidate Portal
+
+FIGPEND:ui_candidate_login.png|Figure 5.2|Candidate Registration and Login. The screen collects an email and password for a new candidate account or authenticates an existing one, issuing the JWT bearer token that gates every subsequent candidate-scoped request (UC-01, FR-04).
+
+FIGPEND:ui_candidate_dashboard.png|Figure 5.3|Candidate Dashboard. The landing page after login summarizes the candidate's application activity, outstanding notifications, and current skill-gap status at a glance, linking out to every other candidate screen below.
+
+FIGPEND:ui_candidate_profile.png|Figure 5.4|Candidate Profile Management. The screen manages the structured profile data — education, work experience, certifications, languages, and projects — that both the CV builder and the matching engine's skill-match signal draw on (UC-02).
+
+FIGPEND:ui_candidate_resume_upload.png|Figure 5.5|Resume Upload and AI-Parsed Preview. The screen accepts a PDF or DOCX resume, sends it to the AI service for parsing, and shows the extracted skills, contact details, and text as an editable preview before the candidate confirms it (UC-03, FR-02, Figure C.1).
+
+FIGPEND:ui_candidate_cv_builder.png|Figure 5.6|CV Builder. The screen assembles a subset of the candidate's profile data into a structured, exportable CV, using the CvSectionItem selection model described in Section 4.4.2 (UC-04, FR-03).
+
+FIGPEND:ui_candidate_job_search.png|Figure 5.7|Job Search and Application. The screen lists published jobs with filtering, and lets the candidate submit an application that triggers the multi-signal scoring pipeline shown in Figure 5.1 (UC-05, FR-05).
+
+FIGPEND:ui_candidate_match_score.png|Figure 5.8|Match Score Breakdown. The screen shows the weighted score behind a proactive match or a submitted application broken down by signal — skill match, semantic similarity, and assessment score where applicable — rather than a single opaque number (UC-06, NFR-06).
+
+FIGPEND:ui_candidate_skill_gap.png|Figure 5.9|Skill Gap and Improvement Plan. The screen shows the AI-explained gap between the candidate's profile and a target role alongside the generated, sequenced improvement plan (UC-07, FR-07, FR-08).
+
+FIGPEND:ui_candidate_evidence.png|Figure 5.10|Skill Evidence Submission. The screen lets the candidate attach a link, file, or certificate against a plan step and shows its verification status once the confidence-gated review in Algorithm 4 has run (UC-08, FR-09).
+
+FIGPEND:ui_candidate_assessment.png|Figure 5.11|Skill Assessment Attempt. The screen presents the AI-generated multiple-choice and free-text questions for a job's assessment and submits the candidate's answers for grading (UC-09, FR-13).
+
+FIGPEND:ui_candidate_chatbot.png|Figure 5.12|Recruitment Chatbot. The screen shows the candidate-scoped chatbot conversation, answering only questions in scope of the candidate's own data per the ChatScopeGate logic in Section 5.2 (UC-10, FR-16).
+
+FIGPEND:ui_candidate_notifications.png|Figure 5.13|Candidate Notifications. The screen lists in-app notifications for matches, application-status changes, interviews, and feedback (UC-11, FR-17).
+
+## 5.3.2 Employer Portal
+
+FIGPEND:ui_employer_login.png|Figure 5.14|Employer Registration and Login. The screen mirrors the candidate login flow (Figure 5.2) but issues a JWT carrying the Employer role claim (UC-01).
+
+FIGPEND:ui_employer_dashboard.png|Figure 5.15|Employer Dashboard. The landing page summarizes the employer's open job posts, pending moderation status, and recent applicant activity.
+
+FIGPEND:ui_employer_company_profile.png|Figure 5.16|Company Profile Management. The screen manages the company details shown to candidates on every job posting (UC-12).
+
+FIGPEND:ui_employer_job_post.png|Figure 5.17|Job Posting with AI-Assisted Description Generation. The screen accepts minimal job requirements, calls GenerateJobDescriptionAsync (Section 5.2) for an editable AI draft, and submits the approved posting for admin moderation (UC-13, UC-14, FR-11, Figure C.2).
+
+FIGPEND:ui_employer_applicants.png|Figure 5.18|Ranked Applicant List. The screen lists applicants ordered by Total Score with the same per-signal breakdown shown to the candidate in Figure 5.8, so the ranking is auditable rather than a black box (UC-15, FR-12).
+
+FIGPEND:ui_employer_assessment_setup.png|Figure 5.19|Skill Assessment Configuration. The screen toggles a job's RequireAssessment flag and previews the AI-generated question set attached to it (UC-16, FR-13).
+
+FIGPEND:ui_employer_interview.png|Figure 5.20|Interview Scheduling. The screen sets the mode, date/time, and notes for an interview against a shortlisted application (UC-17, FR-14, Figure C.6).
+
+FIGPEND:ui_employer_feedback.png|Figure 5.21|Candidate Feedback Review and Approval. The screen shows the AI-drafted feedback message for the employer to review and approve before it is sent, the human-in-the-loop control described in Section 5.2 (UC-18, FR-15).
+
+## 5.3.3 Administrator Portal
+
+FIGPEND:ui_admin_dashboard.png|Figure 5.22|Administrator Dashboard. The landing page summarizes pending job moderation items, open evidence-review escalations, and AI-service health at a glance.
+
+FIGPEND:ui_admin_users.png|Figure 5.23|User Management. The screen lists candidate and employer accounts with the ability to suspend or reinstate them (UC-19).
+
+FIGPEND:ui_admin_job_moderation.png|Figure 5.24|Job Post Moderation. The screen shows jobs pending review with an approve/reject decision and reason, matching the admin-moderation gate in Figure 4.4 (UC-20, FR-18).
+
+FIGPEND:ui_admin_skill_taxonomy.png|Figure 5.25|Skill Taxonomy Management. The screen manages the Skill and SkillAlias records the matching and parsing pipeline normalize against (UC-21, FR-19).
+
+FIGPEND:ui_admin_knowledge_base.png|Figure 5.26|Knowledge Base Management. The screen curates the FAQ, policy, and skill-advice content the chatbot is permitted to draw on (UC-22, FR-19).
+
+FIGPEND:ui_admin_evidence_review.png|Figure 5.27|Manual Skill Evidence Review. The screen queues low-AI-confidence evidence submissions (Algorithm 4's escalation path) for a human decision (UC-23, FR-09).
+
+FIGPEND:ui_admin_audit_log.png|Figure 5.28|Audit Log Review. The screen lists the immutable, append-only log of AI-influenced and administrative actions (UC-24, FR-20, NFR-09).
+
+FIGPEND:ui_admin_ai_health.png|Figure 5.29|AI Service Health Monitoring. The screen shows the liveness of the external AI service via its /health endpoint, backing the degraded-mode behaviour described in NFR-03 (UC-25, FR-21).
+
+FIGPEND:ui_admin_reports.png|Figure 5.30|Platform Reporting. The screen generates recruitment and system-usage reports drawing on application, job, and audit-log data (UC-26, FR-19).
+
+# 5.4 Chapter Summary
+
+This chapter detailed how the research design from Chapter 4 was implemented: the weighted, multi-signal scoring algorithms that form the system's central contribution; the technology choices behind the .NET backend, the Python AI service, and the React frontend, each justified against the alternatives considered; and the implementation of the platform's most significant AI-driven features — job description generation, candidate ranking, skill-gap explanation, evidence review, the role-aware chatbot, and resume parsing — each built with a human-in-the-loop or confidence-gated control point rather than as an unsupervised automatic decision-maker. Chapter 6 now turns to testing this implementation against the functional and non-functional requirements set out in Section 4.6, and to evaluating the trained candidate-job fit classifier referenced throughout this chapter.

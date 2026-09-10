@@ -1,0 +1,62 @@
+#C APPENDICES
+
+# Appendix A - Additional Use Case Specifications
+
+This appendix lists the remaining use cases shown in Figure 4.1 that were not detailed in Section 4.4.1, in brief form: identifier, actor, and a short description of the goal each use case achieves. Full step-by-step flows follow the same structure as Table 4.3 and Table 4.4 and are omitted here for brevity, since each is a straightforward CRUD or read-only flow rather than one carrying distinct scoring or AI-review logic.
+
+TCAP:Table A.1|Additional Use Case Specifications.
+| ID | Use Case | Actor | Brief Description |
+| UC-01 | Register / Login | Candidate, Employer, Admin | Create an account or authenticate against an existing one, receiving a role-scoped JWT bearer token |
+| UC-02 | Manage Candidate Profile | Candidate | Create, view, and edit structured profile data: education, work experience, certifications, languages, and projects |
+| UC-04 | Build CV (PDF) | Candidate | Assemble selected profile sections into a structured CV and export it as a PDF via the CV builder |
+| UC-05 | Search & Apply for Jobs | Candidate | Filter published jobs by title, skill, work arrangement, and employment type, then submit an application |
+| UC-06 | View Match Score | Candidate | View the score breakdown (skill match, semantic similarity, assessment score where applicable) behind a proactive match or a submitted application |
+| UC-08 | View Skill Gap & Plan | Candidate | View the AI-explained skill gap for a target job and the generated skill-improvement plan |
+| UC-09 | Use Recruitment Chatbot | Candidate, Employer, Admin | Ask role-scoped recruitment questions and receive answers drawn only from that role's own data and the knowledge base |
+| UC-10 | View Notifications | Candidate, Employer | View in-app notifications for matches, application-status changes, interviews, and feedback |
+| UC-11 | Manage Company Profile | Employer | Create and edit the employer's company profile, including logo, size, and description |
+| UC-12 | Post / Publish Job | Employer | Submit a job posting for admin moderation and, once approved, publish it to candidates |
+| UC-13 | Schedule Interview | Employer | Set an interview mode, date/time, and notes for a shortlisted candidate's application |
+| UC-15 | Give Candidate Feedback | Employer | Issue AI-assisted, employer-approved feedback to a candidate following a decision |
+| UC-16 | Manage Users | Administrator | View, suspend, or reinstate candidate and employer accounts |
+| UC-17 | Moderate Job Posts | Administrator | Approve, edit, or reject a job posting before it becomes visible to candidates |
+| UC-18 | Manage Skill Taxonomy | Administrator | Add, edit, or merge skills and their aliases used by the matching and parsing pipeline |
+| UC-19 | Manage Knowledge Base | Administrator | Curate the FAQ, policy, and skill-advice content the chatbot is permitted to draw on |
+| UC-20 | Review Audit Log | Administrator | Inspect the immutable log of AI-influenced and administrative actions |
+| UC-21 | Monitor AI Service Health | Administrator | View the liveness and recent error rate of the external AI service via its /health endpoint |
+| UC-22 | Generate Reports | Administrator | Produce platform-level recruitment and system-usage reports |
+
+# Appendix B - Additional Test Cases
+
+This appendix lists the remaining functional and non-functional test cases derived from Table 4.5 and Table 4.6 that were not detailed in Section 6.2, following the same Test ID / Requirement / Test Steps / Expected Result / Traced To structure.
+
+TCAP:Table B.1|Additional Functional Test Cases.
+| Test ID | Requirement | Test Steps | Expected Result | Traced To |
+| FTC-08 | FR-03 | Request a CV PDF export for a candidate profile with at least one entry in every section | A single, correctly ordered PDF is generated containing only the sections the candidate selected | CvService (QuestPDF renderer) |
+| FTC-09 | FR-14 | Employer schedules an interview for a Shortlisted application | Application status transitions to Interview and an Interview record is created with the chosen mode and time | Interview scheduling workflow (Section 4.4.5) |
+| FTC-10 | FR-18 | Administrator rejects a submitted job post with a reason | Job status remains Draft (not Published) and the employer receives the rejection reason | JobModerationService |
+| FTC-11 | FR-21 | Administrator opens the AI Service Monitoring screen while the AI service is reachable | CheckHealthAsync returns true and the dashboard shows the service as healthy | SystemStatusService / IAiServiceClient.CheckHealthAsync |
+
+TCAP:Table B.2|Additional Non-Functional Test Cases.
+| Test ID | Requirement | Test Steps | Expected Result | Traced To |
+| NFTC-04 | NFR-05 | Upload a resume file exceeding the configured size limit or of a disallowed type | Upload is rejected with a validation error before the file reaches storage | FileStorageOptions validation, CvController |
+| NFTC-05 | NFR-09 | Attempt to modify or delete an existing AuditLog row directly | No API endpoint exposes update or delete on AuditLog; the table is append-only by design | AuditLogService |
+| NFTC-06 | NFR-08 | Build the IRAS.API Docker image from the repository root and run the resulting container | The container starts and serves the API on the configured port without requiring the host to have the .NET SDK installed | Dockerfile (multi-stage build) |
+
+# Appendix C - Additional Sequence Diagrams
+
+Section 4.4.4 presented the three sequence diagrams most central to IRAS's AI-assisted contribution. This appendix provides the remaining seven, covering every other AI-dependent or cross-actor workflow in the system, so that every use case in Figure 4.1 is traceable to a concrete message-level flow.
+
+FIG:sequence_registration.png|Figure C.1|Sequence Diagram — Registration & Authentication. The diagram covers UC-01 for all three roles: account creation through AuthController and UserService, followed by login, credential validation against the stored password hash, and JWT issuance carrying the user's role claim.
+
+FIG:sequence_jd_generation.png|Figure C.2|Sequence Diagram — AI-Assisted Job Description Generation, Moderation & Publishing. The diagram covers UC-13 and UC-14 together with UC-20: the employer's AI-drafted job description is only ever saved as Draft, and only an administrator's explicit approval moves it to Published, at which point the flow hands off to the proactive matching sequence in Figure C.3.
+
+FIG:sequence_proactive_matching.png|Figure C.3|Sequence Diagram — Proactive Batch Job Matching & Notification. The diagram shows JobMatchingService retrieving every opted-in, resume-parsed candidate for a newly published job, sending them to the AI service in a single batched /rank call rather than one call per candidate, and creating a JobMatch plus notification only for the candidates whose combined score clears the configured threshold.
+
+FIG:sequence_skill_gap.png|Figure C.4|Sequence Diagram — Skill Gap Explanation & Improvement Plan Generation. The diagram covers UC-07: comparing a candidate's skills against a job's requirements, generating a plain-language AI explanation of the gap, and — on the candidate's request — generating a personalized, sequenced improvement plan.
+
+FIG:sequence_assessment.png|Figure C.5|Sequence Diagram — Skill Assessment: Generation, Attempt & AI Grading. The diagram covers UC-09 and UC-16: a job's assessment questions are generated once (by the AI service) and reused for every subsequent candidate, an attempt is scored automatically for multiple-choice questions and by the AI grader for free-text answers, and the combined result is persisted against the attempt.
+
+FIG:sequence_interview_feedback.png|Figure C.6|Sequence Diagram — Interview Scheduling & Candidate Feedback. The diagram covers UC-17 and UC-18: an employer schedules an interview against a shortlisted application, then, following a hiring decision, an AI-drafted feedback message is generated, reviewed and approved by the employer, and only then delivered to the candidate.
+
+FIG:sequence_chatbot.png|Figure C.7|Sequence Diagram — Role-Aware Chatbot Interaction. The diagram covers UC-10: the role-specific context builder assembles only that authenticated user's own data before the LLM call, and the reply is passed through ChatScopeGate before delivery, so an out-of-scope question is deflected rather than answered.

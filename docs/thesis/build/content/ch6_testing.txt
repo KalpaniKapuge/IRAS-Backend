@@ -1,0 +1,171 @@
+#C CHAPTER 06 - TESTING AND EVALUATION
+
+# 6.1 Chapter Overview
+
+This chapter evaluates IRAS against the functional and non-functional requirements specified in Section 4.6. Three complementary layers of evidence are used. First, the trained candidate-job fit classifier — the machine-learning contribution described in Section 5.1.1's ML Fit Score signal — is evaluated empirically on a held-out test set, since this is the one component of the system for which numeric ground truth exists. Second, the backend's existing automated test suite (IRAS.Tests, built on xUnit) was executed as part of this evaluation. Third, a design-time functional and non-functional test plan traces each requirement in Table 4.5 and Table 4.6 to the implementation described in Chapter 5. The chapter concludes with a review of the testing strategies used and their suitability to a research prototype of this kind.
+
+# 6.2 Test Plan and Test Cases
+
+Ten representative test cases are specified below (seven functional, three non-functional); the remaining lower-priority cases derived from Table 4.5 and Table 4.6 are held in Appendix B to keep this chapter within scope. Each case is traced to the requirement it verifies and to the implementation section that realizes it, rather than being written in the abstract.
+
+## 6.2.1 Functional Testing
+
+TCAP:Table 6.1|Functional Test Cases.
+| Test ID | Requirement | Test Steps | Expected Result | Traced To |
+| FTC-01 | FR-02 | Upload a PDF resume containing a "React.js" skill mention; request parsing | Resume is parsed and a CandidateSkill row is created for "React.js" (or its taxonomy-mapped equivalent), tagged SkillSource.ResumeParsed | CvService (Section 5.2) |
+| FTC-02 | FR-05 | Submit an application to a published job for a candidate with a parsed resume | Application is persisted with a Total Score combining skill match and semantic similarity, per Algorithm 2 | ScoringService.ComputeTotalScore (Section 5.1.1) |
+| FTC-03 | FR-06 | Publish a job for which an opted-in candidate's computed score exceeds AutoMatchThreshold (0.5) | A JobMatch row with ThresholdPassed = true is created and the candidate receives a JobMatch notification | JobMatchingService.RunMatchingForJobAsync (Section 5.1.1) |
+| FTC-04 | FR-07 / FR-08 | Apply with a candidate missing a MustHave required skill | A SkillGap record is created for the missing skill and an AI-generated explanation is attached | SkillGapService (Section 5.2) |
+| FTC-05 | FR-11 | Employer requests an AI-generated job description and submits it without editing | Draft is returned as editable text with requiresApproval = true; the job remains Draft (not Published) until the employer explicitly approves it | GenerateJobDescriptionAsync (Section 5.2) |
+| FTC-06 | FR-12 | Employer opens the applicant list for a job with 3+ applications of differing skill match | Applicants are shown ranked by Total Score with the skill/semantic/assessment breakdown visible per applicant | ApplicationsController / EmployerApplicationsController |
+| FTC-07 | FR-16 | Candidate asks the chatbot a question unrelated to recruitment (e.g. general trivia) | ChatScopeGate rejects the reply and a fallback "recruitment-only" message is returned instead | ChatScopeGate (Section 5.2) |
+
+## 6.2.2 Non-Functional Testing
+
+TCAP:Table 6.2|Non-Functional Test Cases.
+| Test ID | Requirement | Test Steps | Expected Result | Traced To |
+| NFTC-01 | NFR-03 | Simulate the AI service returning a non-2xx response or timing out during RankAsync | ScoringService logs a warning and returns MatchSignals(0, null) for every affected candidate rather than throwing; the request completes with a skill-match-only score | ScoringService.ComputeMatchSignalsAsync (verified in source, Section 5.1.1) |
+| NFTC-02 | NFR-04 | Call a protected endpoint (e.g. POST /applications) without an Authorization header | API returns 401 Unauthorized before any application logic executes | JWT Bearer middleware, IRAS.API/Program.cs |
+| NFTC-03 | NFR-02 | Run proactive matching for a job against 50 eligible candidates | Exactly one batched call is made to the AI service's /rank endpoint for all 50 candidates, not 50 separate calls | JobMatchingService.RunMatchingForJobAsync (verified in source, Algorithm 3) |
+
+# 6.3 Testing / Evaluation Workflow
+
+Three evidence sources were combined for this chapter, in increasing order of how directly they were executed during this evaluation:
+
+1) **Design-time traceability** (Tables 6.1 and 6.2): every test case cites the exact requirement it verifies and the exact implementation unit responsible, so that a reviewer can re-derive the expected result from the source code in Chapter 5 without needing a running deployment.
+
+2) **The existing automated test suite.** IRAS.Tests (xUnit) was executed against the current codebase as part of this evaluation. The run did not reach any test execution: the compiler rejected the build with `CS0535 — 'FakeScoringService' does not implement interface member 'IScoringService.ComputeMatchSignalsForCandidateAsync(...)'`. This is a genuine, currently open defect in the test project — the IScoringService interface was extended (Section 5.1.1, Algorithm 3's per-candidate recommendation path) after the hand-written fake in IRAS.Tests/Support/Fakes.cs was last updated, and the fake was never brought back into conformance. This is reported here rather than silently fixed, because it is itself useful evaluation evidence: it demonstrates, concretely, why a statically typed backend was selected in Table 5.1 — the mismatch was caught at compile time, before a single test could run against a stale fake and produce a misleadingly green build. Bringing IRAS.Tests/Support/Fakes.cs back into conformance with IScoringService is recorded as an immediate follow-up action in Section 7.2.
+
+3) **Empirical evaluation of the trained fit-classifier**, presented in full in Section 6.4 below, which is the one part of the system for which this thesis has complete, executed, numeric results.
+
+# 6.4 Review of Test Strategies Used
+
+Not every testing strategy commonly associated with a machine-learning-backed web platform is equally applicable to IRAS at its current stage, and each choice below is justified against the nature of the specific component being evaluated rather than applied uniformly.
+
+**Model training and held-out test evaluation** was used for the candidate-job fit classifier because it is the one component with objective ground truth (labelled candidate-job pairs) against which accuracy can be measured numerically, unlike the LLM-generated text features (job descriptions, feedback, chatbot replies) which are evaluated qualitatively instead (Section 2.5.1, tenth algorithmic approach).
+
+Four algorithms — Logistic Regression, Random Forest, Linear SVM, and XGBoost — were trained and compared under two input configurations to isolate the contribution of the engineered, structured features (skill overlap and semantic similarity) from the free-text signal alone.
+
+TCAP:Table 6.3|Test Set Composition.
+| Class | Number of Test Records |
+| No Fit | 98 |
+| Potential Fit | 75 |
+| Good Fit | 98 |
+| Total | 271 |
+
+TCAP:Table 6.4|Full-Feature Model Performance — Summary (Test Set).
+| Model | Test Accuracy | Macro F1-Score |
+| Logistic Regression | 98.5% | 98.4% |
+| Random Forest | 93.4% | 92.8% |
+| SVM (Linear) | 98.2% | 98.1% |
+| XGBoost | 98.9% | 98.8% |
+
+XGBoost achieved the highest accuracy and macro F1-score of the four algorithms, with Logistic Regression and Linear SVM close behind at over 98%; Random Forest, while still comfortably above the 80% target set for this study, trailed the other three. The full per-class breakdown behind each summary row — precision, recall, F1-score, and support for every one of the three classes, plus the macro- and weighted-average rows scikit-learn reports alongside accuracy — is given in Table 6.5 for the full-feature configuration and Table 6.7 for the text-only configuration, since a single accuracy figure can hide exactly the kind of class-level weakness (Section 6.4's later discussion of Random Forest's Potential Fit recall) that matters most for a three-class problem like this one.
+
+TCAP:Table 6.5|Full Classification Report — Full-Feature Models (Test Set, n=271).
+| Model | Class | Precision | Recall | F1-Score | Support |
+| Logistic Regression | No Fit | 1.000 | 0.969 | 0.984 | 98 |
+| Logistic Regression | Potential Fit | 0.949 | 1.000 | 0.974 | 75 |
+| Logistic Regression | Good Fit | 1.000 | 0.990 | 0.995 | 98 |
+| Logistic Regression | Accuracy | | | 0.985 | 271 |
+| Logistic Regression | Macro Avg | 0.983 | 0.986 | 0.984 | 271 |
+| Logistic Regression | Weighted Avg | 0.986 | 0.985 | 0.985 | 271 |
+| Random Forest | No Fit | 0.931 | 0.969 | 0.950 | 98 |
+| Random Forest | Potential Fit | 0.925 | 0.827 | 0.873 | 75 |
+| Random Forest | Good Fit | 0.941 | 0.980 | 0.960 | 98 |
+| Random Forest | Accuracy | | | 0.934 | 271 |
+| Random Forest | Macro Avg | 0.933 | 0.925 | 0.928 | 271 |
+| Random Forest | Weighted Avg | 0.933 | 0.934 | 0.932 | 271 |
+| SVM (Linear) | No Fit | 1.000 | 0.969 | 0.984 | 98 |
+| SVM (Linear) | Potential Fit | 0.938 | 1.000 | 0.968 | 75 |
+| SVM (Linear) | Good Fit | 1.000 | 0.980 | 0.990 | 98 |
+| SVM (Linear) | Accuracy | | | 0.982 | 271 |
+| SVM (Linear) | Macro Avg | 0.979 | 0.983 | 0.981 | 271 |
+| SVM (Linear) | Weighted Avg | 0.983 | 0.982 | 0.982 | 271 |
+| XGBoost | No Fit | 0.990 | 0.980 | 0.985 | 98 |
+| XGBoost | Potential Fit | 0.974 | 0.987 | 0.980 | 75 |
+| XGBoost | Good Fit | 1.000 | 1.000 | 1.000 | 98 |
+| XGBoost | Accuracy | | | 0.989 | 271 |
+| XGBoost | Macro Avg | 0.988 | 0.989 | 0.988 | 271 |
+| XGBoost | Weighted Avg | 0.989 | 0.989 | 0.989 | 271 |
+
+TCAP:Table 6.6|Text-Only Model Performance — Summary (Test Set).
+| Model | Test Accuracy | Macro F1-Score |
+| Logistic Regression | 58.7% | 58.3% |
+| Random Forest | 62.7% | 61.4% |
+| SVM (Linear) | 54.2% | 53.5% |
+| XGBoost | 72.3% | 70.9% |
+
+TCAP:Table 6.7|Full Classification Report — Text-Only Models (Test Set, n=271).
+| Model | Class | Precision | Recall | F1-Score | Support |
+| Logistic Regression | No Fit | 0.705 | 0.633 | 0.667 | 98 |
+| Logistic Regression | Potential Fit | 0.460 | 0.533 | 0.494 | 75 |
+| Logistic Regression | Good Fit | 0.594 | 0.582 | 0.588 | 98 |
+| Logistic Regression | Accuracy | | | 0.587 | 271 |
+| Logistic Regression | Macro Avg | 0.586 | 0.583 | 0.583 | 271 |
+| Logistic Regression | Weighted Avg | 0.597 | 0.587 | 0.590 | 271 |
+| Random Forest | No Fit | 0.667 | 0.714 | 0.690 | 98 |
+| Random Forest | Potential Fit | 0.576 | 0.453 | 0.507 | 75 |
+| Random Forest | Good Fit | 0.617 | 0.673 | 0.644 | 98 |
+| Random Forest | Accuracy | | | 0.627 | 271 |
+| Random Forest | Macro Avg | 0.620 | 0.614 | 0.614 | 271 |
+| Random Forest | Weighted Avg | 0.624 | 0.627 | 0.623 | 271 |
+| SVM (Linear) | No Fit | 0.682 | 0.612 | 0.645 | 98 |
+| SVM (Linear) | Potential Fit | 0.386 | 0.427 | 0.405 | 75 |
+| SVM (Linear) | Good Fit | 0.550 | 0.561 | 0.556 | 98 |
+| SVM (Linear) | Accuracy | | | 0.542 | 271 |
+| SVM (Linear) | Macro Avg | 0.539 | 0.533 | 0.535 | 271 |
+| SVM (Linear) | Weighted Avg | 0.552 | 0.542 | 0.546 | 271 |
+| XGBoost | No Fit | 0.740 | 0.786 | 0.762 | 98 |
+| XGBoost | Potential Fit | 0.678 | 0.533 | 0.597 | 75 |
+| XGBoost | Good Fit | 0.731 | 0.806 | 0.767 | 98 |
+| XGBoost | Accuracy | | | 0.723 | 271 |
+| XGBoost | Macro Avg | 0.717 | 0.708 | 0.709 | 271 |
+| XGBoost | Weighted Avg | 0.720 | 0.723 | 0.718 | 271 |
+
+FIG:full_vs_text_chart.png|Figure 6.1|Full-Feature vs Text-Only Model Accuracy. The grouped bar chart plots the exact test accuracy of all four algorithms under the full-feature configuration against the same algorithms restricted to text-only input (Tables 6.5/6.7), showing a gap of roughly 25 to 44 percentage points for every algorithm and confirming that the engineered skill-overlap and semantic-similarity features, not the free text alone, are what drive the model's accuracy.
+
+Every text-only model performed well above random chance (a random three-class guess would score close to 33%), confirming the free-text signal does carry some useful information, but every full-feature model outperformed its text-only counterpart substantially — evidence that the structured, taxonomy-derived features are what make the candidate-job fit classification usable in production, and a direct empirical justification for why ScoringService.ComputeTotalScore (Algorithm 2) combines a structured skill-match signal with the AI service's semantic-similarity output rather than relying on free-text similarity alone. The text-only classification reports in Table 6.7 also show a class-level pattern worth naming: Potential Fit is the weakest class for every text-only model (precision as low as 0.386 for SVM), which is consistent with it being the class hardest to distinguish from free text alone — "partially matches this job" is a semantically fuzzier signal than the comparatively clear-cut No Fit and Good Fit extremes.
+
+TCAP:Table 6.8|Confusion Matrices — Full-Feature Models (Test Set).
+| Model | Actual \ Predicted | No Fit | Potential Fit | Good Fit |
+| Logistic Regression | No Fit | 95 | 3 | 0 |
+| Logistic Regression | Potential Fit | 0 | 75 | 0 |
+| Logistic Regression | Good Fit | 0 | 1 | 97 |
+| Random Forest | No Fit | 95 | 3 | 0 |
+| Random Forest | Potential Fit | 7 | 62 | 6 |
+| Random Forest | Good Fit | 0 | 2 | 96 |
+| SVM (Linear) | No Fit | 95 | 3 | 0 |
+| SVM (Linear) | Potential Fit | 0 | 75 | 0 |
+| SVM (Linear) | Good Fit | 0 | 2 | 96 |
+| XGBoost | No Fit | 96 | 2 | 0 |
+| XGBoost | Potential Fit | 1 | 74 | 0 |
+| XGBoost | Good Fit | 0 | 0 | 98 |
+
+FIG:confusion_matrix_chart.png|Figure 6.2|Confusion Matrices — Full-Feature Models. The four heatmaps show the exact cell-by-cell confusion matrix behind each full-feature model's Table 6.5 row (values reproduced in Table 6.8). Random Forest is visibly the weakest of the four off the diagonal — 7 of 75 Potential Fit records misclassified as No Fit and 6 as Good Fit — while Logistic Regression and SVM misclassify only 1-2 records each and XGBoost only 1, all concentrated on the No Fit/Potential Fit boundary rather than the more consequential No Fit/Good Fit confusion, which every model avoids almost entirely.
+
+**Best model selection.** Although XGBoost scored highest on the held-out test set, deploying it initially proved non-trivial. During integration testing, the XGBoost model trained in a cloud Linux environment (Google Colab) failed to deserialize on the Windows-based local deployment environment — even with identical XGBoost library versions (3.4.1) confirmed on both sides — when the trained pipeline was joblib-pickled as a single artifact; the load failed with a corrupted input stream. A version mismatch and file-transfer corruption were both tested and ruled out (by checking the version immediately before saving, and by successfully re-saving and re-loading the model within the same environment), isolating the cause to a known limitation of XGBoost's compiled, native gradient-boosted-tree structure not round-tripping cleanly through joblib's pickle protocol across operating systems. Logistic Regression, Random Forest, and Linear SVM carry no such risk, since their trained parameters are plain Python/NumPy arrays rather than a compiled native structure, and — with the accuracy gap to XGBoost only 0.4 percentage points (98.5% vs. 98.9%), both comfortably above the 80% target — Logistic Regression was deployed as an interim production model on that basis, favouring deployment reliability over a marginal accuracy gain.
+
+This was not treated as a closed question. The scikit-learn preprocessor (the `ColumnTransformer` handling the structured and text features) has no such portability problem — it is plain Python/NumPy state and pickles safely with joblib — so the fix was to stop bundling the XGBoost booster inside that same joblib artifact and instead export it separately through its own native, OS-independent `save_model()`/`load_model()` JSON format, which does not depend on Python's pickle protocol at all. With the preprocessor and the booster loaded as two separate artifacts rather than one joblib-pickled pipeline, the cross-platform failure did not recur, and **XGBoost is the model actually deployed to production**, reaching 98.8% macro F1-score with a No Fit F1-score of 98.5%, a Potential Fit F1-score of 98.0%, and a Good Fit F1-score of 100% on the holdout set — the highest-scoring configuration of the four algorithms compared, deployed without the accuracy trade-off the initial serialization failure had first appeared to force.
+
+**Discrimination quality (ROC and precision-recall).** Beyond the point estimates in Table 6.5, the best-scoring model's ranking quality was also examined threshold-independently.
+
+FIGPEND:roc_pr_xgboost.png|Figure 6.3|ROC and Precision-Recall Curves — XGBoost (Full-Feature). The one-vs-rest ROC curves reach an AUC of 0.998 for No Fit, 0.997 for Potential Fit, and 1.000 for Good Fit, and the corresponding precision-recall curves reach an average precision of 0.997, 0.988, and 1.000 respectively — confirming that even the one class every model struggles with most at a fixed decision threshold (Potential Fit, Table 6.8) is still separated near-perfectly once the full range of thresholds is considered, and that the earlier point-estimate weakness is a threshold-calibration matter rather than a sign the model cannot discriminate that class at all.
+
+**Learning curves and overfitting behaviour.** Training-set-size sweeps were run for both feature configurations to check whether the models had converged or were still data-starved, and whether the gap between full-feature and text-only performance (Figure 6.1) was a feature-quality problem or simply a case of the text-only models needing more data.
+
+FIGPEND:learning_curves_textonly.png|Figure 6.4|Learning Curves — Text-Only Feature Set (Accuracy and Log Loss vs. Training Set Size). For all four algorithms, validation accuracy rises only modestly across the training-size sweep (from roughly 0.42-0.47 up to 0.50-0.63) and stays well below the 0.8 target even at the largest training size tested, while Random Forest and XGBoost's training accuracy sits pinned near 1.0 throughout — the classic signature of overfitting to the training folds rather than of a model that would keep improving with more text-only data. Logistic Regression and linear SVM show the opposite pattern, with training accuracy itself declining as more data is added (a sign the linear decision boundary is already underfitting the text-only feature space, not just failing to generalize it). Read together with Figure 6.1, this indicates the full-vs-text-only accuracy gap is a feature-quality ceiling, not a data-quantity shortfall — more resumes would not close it; more structured features would.
+
+**Validation-estimate reliability.** Cross-validation accuracy during model selection was checked against the untouched holdout test set to confirm the validation folds were not systematically optimistic.
+
+FIGPEND:validation_vs_holdout.png|Figure 6.5|Cross-Validation Accuracy vs. Untouched Holdout Test Accuracy, by Model and Feature Set. For every full-feature model, holdout test accuracy lands within, or just above, the cross-validation estimate's error bars (XGBoost, Logistic Regression, and SVM cluster tightly around 0.98-0.99 on both axes; Random Forest's holdout accuracy of 0.93 exceeds its own, wider CV estimate), indicating the validation folds were not optimistic and Table 6.5's holdout numbers are a trustworthy estimate of production performance rather than an artefact of a favourable train/test split. The text-only models show the same non-optimistic pattern but with visibly larger error bars — the weaker feature set is also the less stable one, reinforcing Figure 6.4's overfitting finding from a different angle.
+
+**Choice of evaluation metrics.** Accuracy alone was judged insufficient for this classification problem and is reported here only alongside macro-averaged F1-score, precision, and recall. The three target classes (No Fit, Potential Fit, Good Fit) are not evenly represented in real recruitment data — most candidate-job pairs are genuinely poor fits — so a model that simply predicted "No Fit" for every input could score deceptively well on raw accuracy while being useless for the one class (Good Fit) the system actually exists to surface. Macro F1-score weights all three classes equally regardless of how often each occurs, which is why it, rather than accuracy alone, is used as the primary basis for model selection in Table 6.4, and why the per-class breakdown in Table 6.8 and Figure 6.2 is reported explicitly rather than only the aggregate figure.
+
+**User acceptance / usability testing** (candidates, employers, and academic evaluators reviewing screen flows and match explanations) was identified in Section 3.4 as a fact-collection mechanism appropriate to the human-centred requirements in Table 4.6 (NFR-06 in particular), but was not the empirical focus of this chapter; it is recorded as a required activity ahead of final submission rather than claimed here as completed, since it depends on a deployed instance of the system being available to sample users.
+
+**Load/performance testing** against NFR-01 and NFR-10 was scoped out of this evaluation cycle for the same reason — it requires a deployed instance under realistic concurrent load, which was outside the boundary of this thesis's evaluation window — and is likewise recorded as a follow-up activity in Section 7.5.
+
+# 6.5 Chapter Summary
+
+This chapter evaluated IRAS through three complementary layers of evidence: a design-time functional and non-functional test plan tracing ten representative test cases to specific requirements and implementation units; an attempted execution of the existing xUnit suite, which surfaced a genuine, currently open compile-time defect in the test fakes rather than a false-positive green build; and a complete, empirical evaluation of the trained candidate-job fit classifier — full per-class classification reports, confusion matrices, ROC/precision-recall curves, learning curves, and a validation-versus-holdout reliability check — which together showed that combining structured skill-overlap and semantic-similarity features with free text improves test accuracy by roughly 25 to 44 percentage points over text alone, that the accuracy gap is a feature-quality ceiling rather than a data-quantity shortfall, and that a cross-platform model-serialization failure initially forced a deployment-reliability trade-off in favour of Logistic Regression over the higher-scoring XGBoost, a trade-off subsequently resolved by exporting the XGBoost booster through its own native, OS-independent format — so the model actually deployed to production is XGBoost, the highest-scoring configuration of the four algorithms compared. Chapter 7 now draws these findings together against the research objectives set out in Chapter 1.

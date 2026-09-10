@@ -1,0 +1,28 @@
+[1] C. Qin et al., "Towards automatic job description generation with capability-aware neural networks," vol. 35, pp. 5341-5355, May 2023.
+[2] World Economic Forum, "The Future of Jobs Report 2025," Geneva, Switzerland, 2025.
+[3] LinkedIn Talent Solutions, "The Future of Recruiting 2025: How AI Redefines Recruiting Excellence," 2025.
+[4] A. Wen et al., "FAIRE: Assessing racial and gender bias in AI-driven resume evaluations," Apr. 2025.
+[5] C. Qin et al., "Towards automatic job description generation with capability-aware neural networks," vol. 35, pp. 5341-5355, May 2023.
+[6] P. Nikumbe et al., "AI based job portal," _International Research Journal of Modernization in Engineering Technology and Science_, vol. 4, pp. 760-763, Apr. 2022.
+[7] K. Wilson et al., "Resume screening, fast and slow: (biased) AI recommendations' influence on human decision making," in _Proc. ACM Conf. Fairness, Accountability, and Transparency_, pp. 5691-5725, Jun. 2026.
+[8] S. Yadav et al., "Resume analysis using NLP and ATS algorithm."
+[9] E. Naik and N. B. Fal Dessai, "Machine learning based resume shortlisting and classification," _International Research Journal of Engineering and Technology (IRJET)_, vol. 11, pp. 2413-2418, 2024.
+[10] M. Kabir, "IntelCV: An intelligent skilled resume selection method for job purposes," 2024.
+[11] B. Kinge et al., "Resume screening using machine learning and NLP: A proposed system," _International Journal of Scientific Research in Computer Science, Engineering and Information Technology_, pp. 253-258, Apr. 2022.
+[12] C. Gan et al., "Application of LLM agents in recruitment: A novel framework for resume screening," Aug. 2024.
+[13] A. Deshmukh and A. Raut, "Enhanced resume screening for smart hiring using Sentence-Bidirectional Encoder Representations from Transformers (S-BERT)," 2024.
+[14] A. M. Mehboob et al., "Evaluating automatic CV shortlisting tool for job recruitment based on machine learning techniques," in _Proc. Mohammad Ali Jinnah Univ. Int. Conf. Computing_, 2022.
+[15] S. Mhatre et al., "Resume screening and ranking using convolutional neural network," in _Proc. Int. Conf. Sustainable Computing and Smart Systems_, pp. 412-419, 2023.
+[16] S. Pranav and S. Hari, "Alcruiter: A proof-of-concept for AI-powered resume screening using large language models," _International Research Journal on Advanced Engineering Hub (IRJAEH)_, vol. 3, pp. 4110-4113, Nov. 2025.
+[17] J. M. Patil et al., "GenAI-powered ATS: Enhancing recruitment with skill fitment analysis," _International Research Journal on Advanced Engineering Hub (IRJAEH)_, vol. 3, pp. 1106-1110, Mar. 2025.
+[18] H. Saxena et al., "AI-powered resume analyzer and job matching system: A comprehensive review."
+[19] V. S. M. Varma, "NLP-automated resume analysis and skill suggesting website," 2024.
+[20] G. K. Lohith et al., "NLP-based resume analysis, skill enhancement & job automation," _International Research Journal of Engineering and Technology (IRJET)_, vol. 12, pp. 1768-1774, 2025.
+[21] K. L. Abhishek et al., "Developing an intelligent resume screening tool with AI-driven analysis and recommendation features," Apr. 2025.
+[22] E. Abdollahnejad et al., "A deep learning BERT-based approach to person-job fit in talent recruitment," in _Proc. Int. Conf. Computational Science and Computational Intelligence (CSCI)_, pp. 98-104, 2021.
+[23] S. H. V. K. S. Buddana et al., "Word level LSTM and recurrent neural network for automatic text generation," in _Proc. Int. Conf. Computer Communication and Informatics (ICCCI)_, 2021.
+[24] C. Sahoo, "Profiling of the candidates: A study of recruitment and selection practices in A&B Technology Services," _IRA-International Journal of Management & Social Sciences_, vol. 4, Aug. 2016.
+[25] P. Sroison and J. H. Chan, "Resume parser with natural language processing," Dec. 2021.
+[26] J. Jiang et al., "Learning effective representations for person-job fit by feature fusion," Jun. 2020.
+[27] Monica et al., "Job seekers' perspectives on the use of AI chatbots in the recruitment process," 2024.
+[28] A. Aka et al., "Better together: Quantifying the benefits of AI-assisted recruitment," Jul. 2025.

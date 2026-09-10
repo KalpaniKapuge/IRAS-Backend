@@ -1,0 +1,179 @@
+#C CHAPTER 01 - INTRODUCTION
+
+# 1.1 Chapter Overview
+
+This chapter presents the research study on the Intelligent Recruitment Automation System (IRAS) for job description creation, application shortlisting, candidate matching, CV generation, interview scheduling, and skill gap identification. It sets the stage for the problem, places emphasis on the difficulties present in conventional recruitment, poses a problem statement, asks a set of research questions, states the motivation for the work, formulates the aim and objectives, proposes a solution, defines the scope of the system, outlines the resources required, and provides a summary of the chapter.
+
+The aim of this chapter is to lay the groundwork for the research study. Recruitment is an important process in any organization, but it can be hampered by manual burden, biased decision-making, shortlisting inconsistencies, absent feedback, interview coordination problems, and a lack of transparency. This chapter explains how the proposed system addresses these issues through the use of Artificial Intelligence, Natural Language Processing, Large Language Models, structured scoring algorithms, and web-based workflows.
+
+The system features Candidate, Employer, and Admin workflows for the management of candidate profiles, resume upload, employer job posting, AI-powered job description creation, candidate-job matching, skill gap analysis, CV generation, interview scheduling, notification management, feedback management, chatbot support, knowledge base support, and administrative monitoring.
+
+# 1.2 Problem Background
+
+Recruitment is one of the key functions of any organization, tied directly to business growth, operational efficiency, and competitiveness. In information technology, where demand for professionals is high, identifying a good candidate within a short period is vital. Recruitment is nonetheless a large process comprising job description drafting, vacancy posting, application intake, resume analysis, candidate ranking, shortlisting, interview arrangement, candidate communication, and feedback.
+
+These activities are still performed manually or through semi-automated systems in many organizations. Recruiters may find themselves reviewing numerous resumes, comparing candidates against job specifications, and selecting a candidate within a limited period, which can result in delays, inconsistency, and subjectivity. Traditional resume screening tends to rely on keyword matching, which does not always reflect the true meaning of a candidate's skills, experience, and qualifications. For instance, a candidate could have a solid understanding of backend web development, yet their resume may not contain the exact keywords present in the job description.
+
+Job descriptions present a related problem. Employers or HR staff may draft job specifications hastily, producing descriptions that omit technical requirements, are unclear, unrealistic, or written in a biased manner. Poorly written job specifications can attract the wrong applicants while deterring suitable ones, affecting both candidate experience and recruitment efficiency. Automatic job description generation is an active research area, as discussed by Qin et al. [1], but it is rarely integrated with resume screening and the wider recruitment process.
+
+Candidate-facing challenges are equally important. A poor applicant experience leaves many candidates without feedback, creating a "black box" in which they do not know why they were unsuccessful or which skills they should improve. This restricts opportunities for professional development, especially for university graduates and early-career professionals. Recruitment systems should therefore not only help employers choose candidates, but also inform applicants of their skill deficiencies and support their employability.
+
+The advent of AI, NLP, Machine Learning, and LLMs offers fresh possibilities for improving recruitment. Skills gaps are cited as the biggest challenge to business transformation by 63% of employers, and AI and big data are identified as among the fastest-growing skill categories for 2025-2030 [2]. The same report indicates that 37% of recruiting organizations are already implementing or experimenting with generative AI solutions, up from 27% the previous year [3]. These findings indicate that AI-mediated hiring is becoming a vital requirement of the modern labour market.
+
+Still, serious concerns remain around the use of AI in recruitment. While AI can facilitate faster candidate matching, resume screening, job description generation, skill gap identification, feedback generation, and chatbot assistance, it can also introduce bias, reduce transparency, and encourage over-reliance on automated decisions if implemented poorly. The use of AI tools for resume screening has been found to carry the potential for racial and gender bias in resume scoring [4]. The research problem addressed in this thesis is therefore not limited to automating the recruitment process; it extends to building a cohesive and transparent recruitment support system that guides candidates, employers, and administrators through a structured process, matches candidates with suitable positions, generates CVs, schedules interviews, sends notifications, provides a knowledge base resource, and gives clear feedback.
+
+The IT and Software Engineering domain sharpens this background problem rather than merely inheriting it. Demand for software engineering talent has grown faster than the supply of recruiters equipped to evaluate it technically, so the domain is simultaneously the one under the most hiring pressure and the one where keyword-based screening fails most visibly — a resume that lists "Node.js" will not surface for a posting that asks for "server-side JavaScript," even though any competent technical reviewer would treat the two as equivalent. It is this domain-specific sharpening of the general problem, not recruitment automation in the abstract, that IRAS is scoped to address (Section 1.10).
+
+# 1.3 Problem Statement
+
+The first issue targeted by this research is the inefficiency, lack of uniformity, and lack of transparency in the existing recruitment process. Many recruitment activities are still performed manually, through keyword-based tools, or across disconnected point solutions, even though digital recruitment platforms and Applicant Tracking Systems (ATS) are widely available. This creates problems for both companies and job seekers. Employers may find it difficult to communicate consistently with candidates, schedule interviews, maintain consistent evaluation criteria, identify appropriate candidates, and screen applications efficiently. Candidates, meanwhile, can find it difficult to understand job relevance, recognize their own skill gaps, improve their profiles, create professional CVs, and receive feedback after a rejection.
+
+A number of AI-powered tools have emerged to address individual recruitment challenges, but many are limited in scope to a single part of the process — resume screening, candidate ranking, user profiling, automated matching, or chatbot assistance [5], [6]. As a result, they cannot provide a unified, well-functioning tool for the entire hiring process, from job post creation through to candidate review.
+
+The issue investigated in this research is, therefore, that there is no comprehensive, intelligent system that simplifies the recruitment process end to end — spanning job post creation assistance, CV screening, applicant ranking, skill-gap identification, applicant profiling, automated candidate-job matching, CV generation, interview coordination and notification, feedback provision, knowledge base support, and process monitoring.
+
+## 1.3.1 General Problem
+
+Overall, recruitment systems are not efficient, consistent, or transparent enough. Reviewing a volume of manual applications is time-consuming and involves a degree of subjective interpretation. Employers therefore encounter delayed hiring, inconsistent shortlisting decisions, and difficulty finding the right candidate; qualified applicants may be missed as a result of inefficient selection processes.
+
+This challenge affects not only organizational performance but also candidate development. Job description preparation, resume sorting and ranking, interview arrangement, and candidate communication all place a burden on the employer. Guidance for candidates may be limited, application outcomes unclear, and feedback on the skills that need improvement scarce or absent. Skill gaps are recognized as a significant challenge for business transformation [2], and recruitment systems need to enable skill visibility, identify skill gaps, support candidate development, and make recruitment decisions more transparent.
+
+## 1.3.2 Specific Problem
+
+Recruitment automation for job seekers and employers in the IT and Software Engineering field carries particular requirements, since these roles must be evaluated with a certain level of technical accuracy and detail. A recruiter must weigh programming languages, frameworks, tools, technical expertise, project experience, role fit, and domain knowledge — yet a manual reviewer may not always be technically equipped to assess every resume, and keyword-based filtering cannot always identify links between related technical skills. For example, "ASP.NET Core Web API" and "C# backend development" may be closely related, yet a keyword search could treat them as unrelated terms.
+
+A substantial body of work addresses individual facets of recruitment, including resume screening [1], [3], qualification checking [4], [6], job description generation, candidate feedback, and chatbot support, but most studies and systems address only one facet at a time. Few systems provide an integrated recruitment workflow spanning employer job posting, AI job description generation, candidate profile management, CV shortlisting, candidate ranking, skill gap analysis, AI job-candidate matching, CV generation, interview scheduling, feedback generation, notifications, and chatbot assistance together.
+
+There is, therefore, a specific gap: no single, clearly defined AI-supported recruitment automation system exists for the IT and Software Engineering domain that aligns employer requirements with candidate profiles, produces suitable matches through clear and auditable scores, highlights skill-set gaps, supports candidate development, and assists both employer and candidate throughout the recruitment process. This is the research gap that the Intelligent Recruitment Automation System (IRAS) is designed to address.
+
+# 1.4 Research Question
+
+The primary research question of this research is:
+
+**How is it possible to design, implement, and evaluate an Intelligent Recruitment Automation System powered by Artificial Intelligence that improves job description development, application selection, candidate ranking, skill-gap identification, automated job-candidate matching, CV writing, interview scheduling, feedback provision, and transparency in recruitment for both employers and candidates?**
+
+The sub-research questions are:
+
+1) How can an LLM be used to create descriptive, specific, and less biased job descriptions?
+2) How can NLP and scoring-based techniques help in resume analysis, candidate shortlisting, and candidate ranking?
+3) How can candidate skills be compared with job skill requirements to identify skill gaps and suggest resources for skill enhancement?
+4) What are the benefits of automated feedback generation and chatbot support for candidate communication and transparency?
+5) What is the best way to bring candidate, employer, and administrator workflows together within one web-based recruitment system?
+6) How can CV generation, interview scheduling, notifications, and knowledge base support improve the recruitment process?
+7) How should the system be assessed in terms of matching accuracy, functional correctness, usability, transparency, and recruitment efficiency?
+
+# 1.5 Research Motivation
+
+This research is motivated by the need to overcome limitations of the existing recruitment process. Recruiters must look through many resumes when there are multiple open positions, which is time-consuming, and reviewing large volumes of resumes accurately and consistently is difficult. The manual resume review process is subjective, time-consuming, and inefficient. Candidates, moreover, seldom receive useful feedback when unsuccessful, which reduces transparency and their ability to enhance their job readiness.
+
+While AI is increasingly used in recruitment, poorly designed AI systems can also lead to unintended consequences such as biased or unfair results that are difficult to explain. AI-aided recruitment has been found to enhance the recruitment process and save considerable time and resources, yet it must be carefully managed, made transparent, and evaluated to ensure AI-informed choices are accurate [4], [7]. The motivation of this research is, accordingly, to automate the recruitment process while simultaneously improving it by making it transparent, consistent, and supportive for both employers and candidates.
+
+IRAS is motivated to assist employers in creating job descriptions, shortlisting applications, ranking candidates, scheduling interviews, and reaching recruitment decisions, while also assisting candidates with profile management, resume processing, skill gap analysis, CV creation, chatbot guidance, and feedback. This research is valuable from a software engineering standpoint because it involves designing and developing a working web-based system that spans multiple user roles, AI integration, database management, resume and file processing, scoring algorithms, notifications, knowledge base support, chatbot capability, and administrative monitoring.
+
+# 1.6 Research Aim
+
+The aim of this research is to design and develop the Intelligent Recruitment Automation System (IRAS) using AI, NLP, LLMs, and structured scoring methods to enhance the efficiency, consistency, and transparency of the recruitment process, by automating job description creation, application shortlisting, candidate ranking, skill-gap identification, job-candidate matching, CV generation, interview scheduling, feedback provision, notifications, process monitoring, and recruitment-oriented chatbot assistance.
+
+# 1.7 Research Objectives
+
+The research objectives are structured under the usual undergraduate research phases of identification, analysis, design and development, and evaluation. They are directly linked to IRAS, which is designed to assist in generating job descriptions, shortlisting applications, ranking candidates, identifying skill gaps, automating job-candidate matching, creating CVs, scheduling interviews, providing feedback, offering chatbot support, and monitoring administrative tasks within a web-based recruitment system.
+
+## 1.7.1 To Identify
+
+To identify the primary challenges of conventional and existing AI-based recruitment processes, particularly in CV screening, skill-gap identification, candidate ranking, candidate feedback, CV creation, interview scheduling, and chatbot support in recruitment.
+
+## 1.7.2 To Analyze
+
+To analyze the existing state of recruitment automation systems, AI-based resume screening, semantic matching algorithms, LLM-based job description generation, candidate ranking, skill-gap identification, feedback generation, CV generation, interview scheduling, and chatbot-based recruitment processes, together with their advantages, disadvantages, and research gaps.
+
+## 1.7.3 To Design / Implement / Develop
+
+To design and develop a web-based Intelligent Recruitment Automation System comprising three modules — Candidate, Employer, and Admin — with AI-assisted and automated features including job description generation, resume handling, application shortlisting, candidate ranking, skill-gap analysis, automated job-candidate matching, CV generation, interview scheduling, feedback generation, candidate notification, a knowledge base, and chatbot support.
+
+## 1.7.4 To Evaluate
+
+To evaluate the system through technical and end-user evaluation methods: accuracy in ranking candidates, resume handling accuracy, resume-matching relevance, accuracy in identifying skill gaps, processing efficiency, usefulness of AI-generated job descriptions and feedback, correctness of CV generation, system usability, transparency, and user satisfaction.
+
+# 1.8 Rich Picture of the Proposed Solution
+
+The proposed solution's rich picture (Figure 1.1) illustrates the interaction between the main components of IRAS and its stakeholders. There are three main user groups: candidates, employers, and administrators. Candidates can register, create and manage a profile, upload resumes, add skills, search and apply for jobs, receive notifications, view feedback, identify skill gaps, create CVs, access skill-development resources, and use chatbot support. Employers can build an employer profile, use AI to draft job descriptions, post jobs, view applications, shortlist and rank candidates, compare candidate suitability, schedule interviews, provide feedback, and share recruitment updates. Administrators manage users and job postings, create and edit the skill taxonomy, develop the knowledge base, generate reports, keep audit logs, and monitor the system.
+
+The workflow below illustrates that the system does not require resetting between filtering passes; it is a complete recruitment automation tool that integrates job posting, candidate profile management, resume management, application shortlisting, resume ranking, job-candidate matching, skill-gap analysis, CV generation, interview scheduling, feedback provision, notifications, chatbot support, and administrative monitoring. The proposed workflows are:
+
+**Candidate Workflow:** Candidate Registration to Profile Creation to Resume Upload to Resume Handling to Job Search / Auto Matching to Application Submission to Ranking / Match Result to Skill Gap Identification to CV Generation to Skill Development Recommendations to Notifications to Feedback Review to Chatbot Guidance.
+
+**Employer Workflow:** Employer Registration to Employer / Company Profile Creation to Job Requirement Input to AI-Assisted Job Description Generation to Job Posting to Application Review to Candidate Ranking to Candidate Comparison to Interview Scheduling to Hiring Decision to Candidate Feedback to Notifications.
+
+**Admin Workflow:** Admin Login to User Management to Job Post Monitoring to Skill Taxonomy Management to Knowledge Base Management to Report Generation to Audit Log Review to System Status Monitoring to System Settings / Configuration.
+
+FIG:rich_picture.png|Figure 1.1|Rich Picture of the Proposed System. The diagram shows the Candidate, Employer/Company, and Admin user groups surrounding the central Intelligent Recruitment Automation System, together with the AI service layer, database and file storage, skill taxonomy, knowledge base, and the ranking/matching/skill-gap/feedback engine that the core system depends on. Arrows are labelled with the main information exchanged between each user group and the core platform (for example, "uploads resume / applies" and "posts jobs / reviews ranking"), showing that all interaction is mediated through the authenticated core system rather than occurring directly between user groups.
+
+# 1.9 Resource Requirements
+
+## 1.9.1 Hardware
+
+The following hardware components are required for designing, developing, testing, and demonstrating the proposed system.
+
+TCAP:Table 1.1|Hardware Resource Requirements.
+| Hardware Resource | Minimum Requirement | Purpose |
+| Laptop / Desktop Computer | Intel Core i5 or above, 8GB RAM or higher | System development, backend implementation, frontend testing, and documentation |
+| Storage | 256GB SSD or above | Storing source code, database files, uploaded resumes, generated CVs, research documents, and development tools |
+| Internet Connection | Stable broadband connection | AI API integration, package installation, research, version control, and system testing |
+| Server / Cloud Environment | Basic cloud VM, local server, or hosting environment | System deployment, API hosting, database hosting, and project demonstration |
+| Mobile / Secondary Device | Optional smartphone, tablet, or secondary display | Responsive UI testing and user interface validation |
+| Backup Device / Cloud Storage | External drive or cloud storage service | Backup of source code, documents, datasets, and project deliverables |
+
+## 1.9.2 Software
+
+The following software resources are required for development and evaluation.
+
+TCAP:Table 1.2|Software Resource Requirements.
+| Software Resource | Purpose |
+| Windows Operating System | Main development environment |
+| Visual Studio Code / Visual Studio | Frontend and backend development |
+| React.js with Vite | Frontend web application development |
+| Tailwind CSS | User interface styling and responsive design |
+| ASP.NET Core Web API | Backend API development and business service exposure |
+| C# / .NET | Backend programming and application logic implementation |
+| SQL Server / SSMS | Database creation, management, and query execution |
+| Entity Framework Core | Object-relational mapping and database migration management |
+| Python FastAPI | AI service layer for resume parsing, skill extraction, and similarity processing |
+| NLP / ML Libraries | Resume parsing, semantic similarity matching, skill extraction, and text preprocessing |
+| LLM API | AI-assisted job description generation, feedback generation, skill-gap explanation, and chatbot support |
+| QuestPDF | CV PDF generation |
+| JWT Authentication | Secure login, user authentication, and role-based access control |
+| Swagger / OpenAPI | API documentation and backend endpoint testing |
+| Postman | API testing and request validation |
+| Git and GitHub | Version control, source code management, and project backup |
+| Docker | Deployment support and environment consistency |
+
+# 1.10 Project Scope
+
+The scope of the research identifies what is, and what is not, part of the research.
+
+TCAP:Table 1.3|Project Scope.
+| In Scope | Out of Scope |
+| Web-based recruitment automation platform | Full enterprise HR management system |
+| Candidate, Employer, and Admin portals | Payroll and employee management |
+| Candidate profile management | Employee attendance and performance management |
+| Employer / company profile management | Full customer relationship management system |
+| AI-assisted job description generation | Voice-based recruitment interviews |
+| Resume upload and resume handling / parsing | Video interview analysis |
+| Candidate ranking and application shortlisting | Psychometric testing |
+| Skill gap identification | Legal employment contract generation |
+| Skill development recommendations | Certification issuing or formal training delivery |
+| Automated job-candidate matching | Full production-level commercial deployment |
+| CV generation with PDF export | Advanced graphic CV design marketplace |
+| Interview scheduling | Automated video conferencing analysis |
+| Candidate feedback generation | Final hiring decision without human involvement |
+| Recruitment-specific chatbot support | General-purpose chatbot outside recruitment |
+| Knowledge base support for recruitment assistance | Public social media recruitment automation |
+| In-app and email notification support | Large-scale enterprise communication suite |
+| Admin user, job, skill, and report management | Complete job marketplace business operations |
+| Audit logs and system status monitoring | Real-time large-scale enterprise load testing |
+
+The main emphasis of this project is recruitment within the Information Technology and Software Engineering field, using English-language, text-based resumes. Resumes are supported in common file formats such as PDF and DOCX. The system offers the following AI-driven and automated capabilities: generating job descriptions, parsing resumes, ranking candidates, analyzing skill gaps, matching jobs with candidates, generating feedback, recommending skill development, generating CVs, scheduling interviews, sending notifications, and providing recruitment-specific chatbot support. IRAS is a prototype and an academic demonstration system rather than a full-fledged commercial recruitment product.
+
+# 1.11 Chapter Summary
+
+This chapter introduced the Intelligent Recruitment Automation System and described the background of the recruitment problem it addresses. The general and specific problems, the research question, the research motivation, the research aim, the research objectives, the rich picture of the proposed solution, the resource requirements, and the project scope were discussed. The chapter established that existing recruitment systems are fragmented and do not provide a complete, transparent recruitment process integrating job description creation, application shortlisting, candidate ranking, skill-gap analysis, feedback, CV generation, interview scheduling, notifications, knowledge base support, and chatbot assistance. Chapter 2 builds on this foundation with a critical review of the existing literature and comparable systems, before Chapter 3 sets out the research methodology used to design, build, and evaluate IRAS.

@@ -1,0 +1,150 @@
+#C CHAPTER 04 - SYSTEM REQUIREMENT SPECIFICATION
+
+# 4.1 Chapter Overview
+
+This chapter translates the research objectives and methodology set out in Chapters 1 to 3 into a concrete System Requirement Specification (SRS) for the Intelligent Recruitment Automation System. It identifies the system's stakeholders and their concerns, describes how the requirements were operationalized from research objectives and data-gathering activity into concrete system behaviour, and presents the system and model analysis — use case diagram and specifications, class diagram, activity diagram, and sequence diagrams — that formed the design basis for the implementation described in Chapter 5. The chapter closes with the proposed system architecture and the consolidated functional and non-functional requirements.
+
+# 4.2 Stakeholder Analysis
+
+Three primary stakeholder roles interact with IRAS directly, and a fourth, indirect stakeholder — the external AI service — supplies the intelligence behind several of the system's automated features.
+
+The **Candidate** is a job seeker who registers on the platform, builds a profile, uploads and manages a resume, searches and applies for jobs, receives proactive job matches, views their skill gap against a target role, works through a personalized skill-improvement plan, submits evidence of skill development, generates a CV, receives feedback and notifications, and uses the recruitment chatbot. The candidate's primary concern is fairness and transparency: understanding why a match score or rejection occurred and what concrete action would improve their standing.
+
+The **Employer** is a hiring organization's representative who registers a company profile, drafts job postings with AI assistance, publishes vacancies (subject to admin moderation), reviews a ranked and explainable list of applicants, compares candidates, attaches a skill assessment to a role where relevant, schedules interviews, and issues feedback. The employer's primary concern is efficiency without losing trust in the ranking: a shortlist that is fast to produce but still auditable.
+
+The **Administrator** is a platform operator responsible for user management, job-post moderation, skill-taxonomy curation, knowledge-base maintenance, audit-log review, AI-service health monitoring, and reporting. The administrator's primary concern is governance: ensuring that AI-influenced decisions across the platform remain within policy and can be reviewed after the fact.
+
+The **AI Service** is a non-human, indirect stakeholder in the sense that its behaviour (resume parsing accuracy, semantic-similarity quality, fit-classifier confidence, and generated-text quality) directly shapes what every human stakeholder experiences, even though no human interacts with it directly; it is reached only through the core platform's backend.
+
+These four stakeholders do not carry equal weight in every design decision. Where a candidate's transparency need and an employer's efficiency need pull in different directions — for instance, showing the full score breakdown takes marginally longer to render than a bare pass/fail badge — this specification consistently resolves in favour of the candidate's transparency concern, since Section 1.2 identified opaque, feedback-free rejection as the general problem this research set out to address in the first place; an efficient but unexplainable shortlist would solve the employer's problem while leaving the candidate's exactly where Chapter 1 found it.
+
+TCAP:Table 4.1|Stakeholder Concerns and System Response.
+| Stakeholder | Primary Concern | How IRAS Addresses It |
+| Candidate | "Why was I rejected, and what should I improve?" | Explainable, weighted match score; AI-explained skill gap; personalized improvement plan with evidence review |
+| Employer | "How do I shortlist quickly without missing a good fit?" | Multi-signal ranked applicant list broken down by skill, experience, education, and assessment score |
+| Administrator | "Is the AI behaving, and can I prove it?" | Job moderation queue, audit log of AI-influenced actions, AI-service health monitoring, reporting |
+| AI Service | (indirect) Correctness and availability of parsing, ranking, and generation | Bounded-confidence review paths, health-check endpoint, template fallbacks when the AI service is unavailable |
+
+# 4.3 Operationalization Process
+
+The requirements presented in this chapter were not defined in the abstract; each was operationalized from a specific research objective (Section 1.7) and a specific fact-gathering activity (Section 3.4), and then reviewed for validity before being carried into design.
+
+TCAP:Table 4.2|Operationalization: Research Objectives to System Requirements.
+| Research Objective | Data-Gathering Technique Used | Resulting Requirement(s) | Validity Check |
+| To identify recruitment-process shortcomings | Literature review; review of existing job-board and ATS platforms | FR set for candidate feedback, skill-gap visibility, and transparent scoring | Cross-checked against the gaps identified in Table 2.1 |
+| To analyze existing screening/matching approaches | Comparative analysis of resume-screening and person-job-fit literature | FR for taxonomy-based skill matching combined with semantic similarity, not keyword-only filtering | Confirmed against the algorithmic analysis in Section 2.5.1 |
+| To design/implement a role-based platform | Review of comparable recruitment-tool feature sets; sample resume/job-post datasets | FR set for Candidate, Employer, and Admin portals and their respective workflows | Validated against the three workflows defined in Figure 1.1 |
+| To evaluate matching, skill-gap, and CV-generation accuracy | Prototype-based testing with synthetic data; user feedback from sample candidates/employers | NFR for accuracy, processing efficiency, and usability; test cases in Chapter 6 | Verified via the test plan and model evaluation in Chapter 6 |
+
+This mapping matters because a requirement that cannot be traced back to a research objective, and a research objective that is not covered by at least one requirement, both indicate a gap in the specification; no such orphaned objective or requirement was found once the tables in Section 4.6 were finalized against Section 1.7.
+
+# 4.4 System / Model Analysis
+
+## 4.4.1 Use Case Diagrams with Specifications
+
+FIG:use_case_diagram_full.png|Figure 4.1|Complete Use Case Diagram of IRAS with «include» / «extend» Relationships. The diagram shows all twenty-six use cases across the three human actors — Candidate (11), Employer (7), and Administrator (8) — against the Intelligent Recruitment Automation System boundary, together with eight explicit UML dependency relationships: four «include» links (a mandatory sub-behaviour always performed as part of the base use case, e.g. Post/Publish Job always includes Generate Job Description) and four «extend» links (an optional behaviour triggered only under a stated condition, e.g. Attempt Skill Assessment extends Search & Apply for Jobs only when the job's RequireAssessment flag is set). The shared Authenticate precondition and the AI Service's supporting role are recorded as a boxed note rather than drawn as connectors, since a line from one corner to a dozen scattered use cases is exactly the kind of visual collision the rest of the diagram was deliberately laid out to avoid.
+
+Full specifications for every use case are provided in Appendix A; the two most significant use cases are detailed below because they carry the system's principal AI-driven contribution.
+
+TCAP:Table 4.3|Use Case Specification: Apply for a Job (Automated Ranking).
+| Field | Description |
+| Use Case ID | UC-07 |
+| Actor(s) | Candidate (primary), AI Service (supporting) |
+| Description | A candidate applies to a published job and receives a weighted match score computed from skill overlap, semantic similarity, a trained fit-classifier, and (where applicable) assessment performance |
+| Preconditions | Candidate is authenticated; candidate has at least one parsed resume; job status is Published |
+| Main Flow | 1. Candidate selects a job and submits an application. 2. System extracts the candidate's skill set and resume text. 3. System computes the taxonomy-based skill match locally. 4. System calls the AI service for semantic similarity and fit-classifier score. 5. System combines signals into a weighted Total Score and, if the job requires one, folds in the assessment score. 6. System persists the application with its score breakdown and any identified skill gaps. 7. Employer's applicant list is updated with the new ranked entry. |
+| Alternative Flow | If the AI service is unavailable, the system falls back to the skill-match signal alone and flags the application as "partially scored" for later re-ranking once the AI service recovers |
+| Postconditions | Application is stored with an auditable score breakdown; SkillGap records exist for any missing required skills |
+
+TCAP:Table 4.4|Use Case Specification: Submit Skill Evidence for Review.
+| Field | Description |
+| Use Case ID | UC-14 |
+| Actor(s) | Candidate (primary), AI Service (supporting), Administrator (supporting) |
+| Description | A candidate submits evidence (a link, file, or certificate) that a step of their personalized skill-improvement plan has been completed, for AI-assisted and administrator-reviewed verification |
+| Preconditions | Candidate has an active SkillImprovementPlan with a step in "Practicing" or "PartiallyCompleted" status |
+| Main Flow | 1. Candidate submits evidence against a plan step. 2. Evidence status is set to Pending. 3. AI evidence reviewer assesses the evidence against the step's target skill and produces a recommendation and confidence level. 4. If confidence is high, the step is auto-updated (Approved/RevisionRequired) with the AI's reasoning attached. 5. If confidence is low, the item is queued for administrator review. 6. Administrator applies the final decision if queued. 7. Candidate's skill status is updated on approval. |
+| Alternative Flow | Candidate withdraws the evidence before a decision is reached, returning the step to Draft |
+| Postconditions | Evidence carries a final verification status (Approved, Rejected, or RevisionRequired) visible to the candidate, and the action is captured in the audit log |
+
+## 4.4.2 Class Diagram and Enhanced Entity-Relationship (EER) Diagram
+
+FIG:class_diagram_full.png|Figure 4.2|Complete Class Diagram of the IRAS Domain Model. The diagram shows all thirty-six persistent entities in IRAS.Domain/Entities, organized into eight module swimlanes — Identity, Candidate Profile and CV, Skills and Development, Employer and Jobs, Applications and Interviews, Assessments, Engagement, and Admin and Governance — each box listing its primary key, foreign keys, and scalar attributes exactly as declared in source. Connector lines show every structural foreign-key relationship with its cardinality (1, 0..1, or *); single-field administrative "actor" references such as CreatedBy, VerifiedBy, ChangedBy, ScheduledBy, ApprovedBy, and UpdatedBy are annotated inline as (FK→User) on the attribute itself rather than drawn as separate connectors, to keep the diagram legible at this scale.
+
+At this level of detail, three structural patterns repeat across modules and are worth naming once rather than per-entity. First, **profile-owned collections** (CandidateProfile → Education/WorkExperience/Certification/CandidateLanguage/CandidateProject/Resume/CvDocument) are all simple one-to-many children with no independent lifecycle — none of them is ever queried or matched against without going through the owning CandidateProfile first. Second, **many-to-many-with-attributes join entities** (CandidateSkill, JobRequiredSkill, CandidateTargetSkill) each carry a composite primary key of the two foreign keys they join plus additional scoring or status attributes (Proficiency/YearsExp, Importance/Weight, Status/AddedAt respectively) — they are not pure link tables, which is why each appears as its own box rather than as a bare connector. Third, **AI-review-gated entities** (SkillPlanEvidence, and to a lesser extent Feedback) each carry both a system-recommended value and a human-decision value side by side (AiConfidenceScore/AiRationale/AutoReviewed alongside VerifiedBy/VerifiedAt/VerifierNotes), which is the data-model expression of the confidence-gated review pattern described algorithmically in Section 5.1.1.
+
+The class diagram above uses UML notation; Figure 4.3 presents the same underlying schema in Enhanced Entity-Relationship (EER) notation, which is the more conventional view for a database-design audience and additionally makes explicit two constructs UML class notation does not distinguish: which entities are structurally weak, and which relationship is a specialization hierarchy rather than a plain association.
+
+FIG:eer_diagram_full.png|Figure 4.3|Enhanced Entity-Relationship (EER) Diagram of the IRAS Database. The diagram re-renders the same thirty-six entities in crow's-foot EER notation: every primary key is underlined, foreign keys are marked inline, and cardinality is shown with crow's-foot glyphs (a single bar for "exactly one," a circle-and-bar for "zero or one," and a circle-and-crow's-foot for "zero or many") rather than UML's plain-text multiplicities. CandidateSkill, JobRequiredSkill, and CandidateTargetSkill are drawn as double-bordered weak entities, since each is identified entirely by the composite of its two foreign keys rather than a surrogate key of its own. A purple ISA triangle marks User's specialization into CandidateProfile and EmployerProfile, labelled {disjoint, partial} — disjoint because a single user account is a candidate or an employer, never both, and partial because an Administrator account is neither subtype.
+
+## 4.4.3 Activity Diagram
+
+FIGWIDE:activity_diagram_full.png|Figure 4.4|Complete Activity Diagram of IRAS — Candidate, AI Service, Employer, and Administrator. The diagram traces the whole-system flow across four swimlanes, from registration through AI-assisted job description generation, admin moderation (with a reject-and-resubmit loop routed back to the employer), proactive batch matching, reactive application scoring with an assessment-required gate, a skill-gap-detected gate leading to AI-explained improvement plans and confidence-gated evidence review, employer shortlisting and a hiring-decision gate, AI-drafted candidate feedback, and the ongoing admin governance cycle, before looping back to the candidate's job search. The lane order (Candidate next to AI Service, rather than at opposite ends) is a deliberate layout choice: it is what keeps the many Candidate-AI transitions short, adjacent-lane hops instead of long diagonals cutting through the Employer and Administrator lanes' own content.
+
+## 4.4.4 Sequence Diagrams
+
+Three sequence diagrams are presented in this section, each mapped to one of the use cases most central to the system's AI-assisted contribution: job application and scoring (UC-07), resume upload and parsing (UC-03), and skill-evidence submission and review (UC-14). Seven further sequence diagrams — covering registration, AI-assisted job description generation and moderation, proactive batch matching, skill-gap explanation, skill-assessment generation and grading, interview scheduling and feedback, and the role-aware chatbot — are provided in Appendix C so that every remaining use case is still traceable to a concrete message flow without lengthening this chapter past what Section 4.4.1's own guidance calls for.
+
+FIG:sequence_matching.png|Figure 4.5|Sequence Diagram — Job Application and Scoring. The diagram traces a candidate's POST /applications request through ApplicationsController and ApplicationService to ScoringService, which calls the external AI service's /rank endpoint for semantic similarity and a fit score, computes the taxonomy-based skill match locally, and persists the combined application score and any skill-gap rows before returning a 201 Created response to the candidate.
+
+FIG:sequence_resume.png|Figure 4.6|Sequence Diagram — Resume Upload and Parsing. The diagram shows a candidate's resume file being saved to file storage by CvService before being sent to the AI service's /parse-resume endpoint, which returns the parsed text and detected skills; CvService then persists the Resume and CandidateSkill rows and returns a preview the candidate can review and correct before it is treated as authoritative.
+
+FIG:sequence_evidence.png|Figure 4.7|Sequence Diagram — Skill Evidence Submission and Review. The diagram shows a candidate's evidence submission moving to Pending status, being assessed by the AI Evidence Reviewer for a recommendation and confidence score, and — only when that confidence is low — being escalated to an Administrator who applies the final Approved/Rejected decision, which is then written back to the evidence's verification status and surfaced to the candidate.
+
+## 4.4.5 State Chart / Deployment Considerations
+
+A full state chart is not required for every entity in the system, but two entities carry enough lifecycle complexity to warrant one: **Application**, which moves through Applied, Screened, Shortlisted, Interview, and then either Hired, Rejected, or Withdrawn; and **SkillPlanEvidence**, which moves through Draft, Pending, and then Approved, Rejected, or RevisionRequired, with RevisionRequired looping back to Draft for a resubmission. Both state machines are enforced at the application-service layer rather than left to the client, so that no combination of client requests can move either entity into an invalid state (for example, an application cannot be marked Hired without first passing through Interview).
+
+FIG:state_chart_diagram.png|Figure 4.8|State Chart Diagrams — Application and SkillPlanEvidence. The upper diagram shows ApplicationStatus as a linear spine (Applied → Screened → Shortlisted → Interview → Hired), with a shared collector line making explicit that Withdrawn and Rejected are each reachable from any of the four non-terminal states while Hired is reachable only from Interview. The lower diagram shows EvidenceVerificationStatus as Draft → Pending branching three ways under AI/admin review (Approved, Rejected, or RevisionRequired), with two distinct loop-back transitions to Draft — one for a candidate withdrawing before a decision is reached, and one for a resubmission after a revision request — each routed on a separate channel so neither crosses the forward spine.
+
+Both diagrams make the same underlying point in different notation to Figure 4.4's activity diagram: an activity diagram shows the *flow of work* across actors, while a state chart shows the *legal state space* of one entity in isolation — here, that every terminal state (the double-ringed circles) is reached only through the transitions drawn, which is what "enforced at the application-service layer" in the paragraph above actually means in implementation terms.
+
+At the deployment level, the system is deployed as two independently deployable units — the ASP.NET Core Web API (containerized with Docker and hosted on Render.com) and the Python AI microservice (hosted separately and reached only over HTTP by the API) — against a managed SQL Server database, with Supabase providing object/file storage only. This separation allows the AI service to be redeployed, retrained, or temporarily taken offline (in which case the API degrades to skill-match-only scoring, as described in Table 4.3) without requiring a redeploy of the core platform.
+
+# 4.5 Proposed System Architecture
+
+FIG:architecture_diagram.png|Figure 4.9|IRAS Layered System Architecture. The diagram shows the five layers of the system from top to bottom — Presentation (the React/TypeScript candidate, employer, and admin portals), API (ASP.NET Core controllers, JWT authentication, and Swagger documentation), Application (the business services that implement matching, skill-gap analysis, assessments, chat, and CV generation), Domain (the persistent entities), and Infrastructure (the database, file storage, and the AI-service HTTP client) — together with the external Python AI service that the Application layer calls over HTTP for resume parsing, semantic ranking, and fit-classification.
+
+The architecture follows a conventional layered (N-tier) design rather than a more elaborate pattern such as CQRS or microservices for the core platform, because the domain does not currently require independently scalable write/read paths, and a single well-tested API deployment is easier for a solo final-year project to operate and reason about than a distributed set of internal services. The one place the system does adopt a service boundary is around AI functionality specifically, where the cost/benefit is different: the AI workload (resume parsing, embeddings, and the trained classifier) has a different technology stack (Python, not .NET), different scaling characteristics (CPU/GPU-bound inference rather than request/response CRUD), and a materially different failure mode (a model or third-party LLM outage should degrade the platform, not take it down) — all reasons that justify carving it out as its own deployable service even while the rest of the system stays a layered monolith.
+
+# 4.6 Functional and Non-Functional Requirements
+
+TCAP:Table 4.5|Functional Requirements.
+| ID | Requirement | Related Module |
+| FR-01 | The system shall allow a candidate to register, authenticate, and manage a structured profile | Candidate |
+| FR-02 | The system shall allow a candidate to upload a resume and have it parsed into structured skills, education, and experience | Candidate / AI Service |
+| FR-03 | The system shall allow a candidate to build and export a CV as a PDF from their structured profile | Candidate |
+| FR-04 | The system shall allow a candidate to search, filter, and apply for published jobs | Candidate |
+| FR-05 | The system shall compute a weighted match score for every application from skill match, semantic similarity, a trained fit-classifier score, and (where present) assessment score | Matching |
+| FR-06 | The system shall proactively notify a candidate when a newly published job clears the configured auto-match threshold | Matching |
+| FR-07 | The system shall identify and explain, in plain language, the skill gap between a candidate's profile and a target job | Skill Gap |
+| FR-08 | The system shall generate a personalized, sequenced skill-improvement plan for an identified gap | Skill Gap |
+| FR-09 | The system shall allow a candidate to submit evidence against a skill-improvement plan step and receive an AI-assisted or administrator-reviewed verification decision | Skill Gap |
+| FR-10 | The system shall allow an employer to register a company profile and post a job | Employer |
+| FR-11 | The system shall allow an employer to generate a structured job description with AI assistance, subject to the employer's review and edit before publishing | Employer |
+| FR-12 | The system shall present the employer with a ranked, explainable list of applicants broken down by individual scoring signal | Employer |
+| FR-13 | The system shall allow an employer to attach a skill assessment to a job, with AI-generated questions and AI-assisted grading | Assessment |
+| FR-14 | The system shall allow an employer to schedule an interview for a shortlisted candidate | Employer |
+| FR-15 | The system shall allow an employer to issue feedback to a candidate, with AI-assisted drafting | Feedback |
+| FR-16 | The system shall provide a role-aware chatbot that answers only within the scope of the authenticated user's role and data | Chat |
+| FR-17 | The system shall send in-app and email notifications for match, application-status, interview, and feedback events | Notifications |
+| FR-18 | The system shall allow an administrator to moderate job postings before publication | Admin |
+| FR-19 | The system shall allow an administrator to manage users, the skill taxonomy, and the recruitment knowledge base | Admin |
+| FR-20 | The system shall record an audit log of AI-influenced actions and allow an administrator to review it | Admin |
+| FR-21 | The system shall allow an administrator to monitor the health and availability of the external AI service | Admin |
+
+TCAP:Table 4.6|Non-Functional Requirements.
+| ID | Category | Requirement |
+| NFR-01 | Performance | A single candidate-job match score shall be computed and persisted in under 3 seconds under normal load, excluding first-call AI-service cold starts |
+| NFR-02 | Scalability | Batch re-ranking of a job's eligible candidates shall use a single batched AI-service call rather than one call per candidate |
+| NFR-03 | Reliability | If the AI service is unreachable, the platform shall degrade to skill-match-only scoring rather than failing the request |
+| NFR-04 | Security | All API endpoints except authentication and public job listing shall require a valid JWT bearer token; role-based authorization shall be enforced per endpoint |
+| NFR-05 | Security | Candidate and employer file uploads shall be validated by type and size before storage |
+| NFR-06 | Usability | Every AI-influenced score or decision visible to a candidate or employer shall be accompanied by a breakdown the user can read without technical knowledge |
+| NFR-07 | Maintainability | The system shall follow a layered architecture (API / Application / Domain / Infrastructure) so that AI-related logic can be revised without redesigning unrelated modules |
+| NFR-08 | Portability | The backend shall be containerized (Docker) so that it can be deployed to any compliant container host |
+| NFR-09 | Auditability | Every administrator action and every AI-driven approval/rejection decision shall be written to an immutable audit log |
+| NFR-10 | Availability | The public-facing API shall target 99% monthly availability, consistent with its single-region managed-cloud deployment |
+
+# 4.7 Chapter Summary
+
+This chapter specified the system requirements for IRAS by first identifying its stakeholders and their concerns, then tracing each requirement back to a research objective and a fact-gathering activity to keep the specification grounded rather than speculative. The use case, class, activity, and sequence diagrams presented the system and model analysis that the implementation in Chapter 5 follows, the layered architecture diagram fixed the system's structural boundaries, and the consolidated functional and non-functional requirement tables provide the checklist against which the testing and evaluation in Chapter 6 is conducted.

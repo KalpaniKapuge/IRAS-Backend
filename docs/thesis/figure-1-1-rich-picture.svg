@@ -1,0 +1,93 @@
+<svg viewBox="0 0 960 680" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Rich picture showing the Candidate, Employer, and Administrator interacting with the central IRAS Core Platform, which in turn delegates resume parsing, ranking, gap explanation, and grading to a backend AI/ML Engine.">
+  <title>Figure 1.1 — Rich Picture of the Proposed IRAS Solution</title>
+
+  <defs>
+    <marker id="arrowCore" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L8,3 L0,6 Z" fill="#2554C7"/>
+    </marker>
+  </defs>
+
+  <text x="480" y="28" text-anchor="middle" font-family="Calibri, Arial, sans-serif" font-size="18" font-weight="700" fill="#1a1a1a">Figure 1.1 — Rich Picture: Actors, Concerns, and Workflow of the Proposed IRAS Solution</text>
+
+  <!-- ===== Connector lines (drawn first, under boxes) ===== -->
+  <!-- Candidate -> Core -->
+  <line x1="250" y1="190" x2="420" y2="280" stroke="#2554C7" stroke-width="2" marker-end="url(#arrowCore)"/>
+  <!-- Employer -> Core -->
+  <line x1="710" y1="190" x2="540" y2="280" stroke="#2554C7" stroke-width="2" marker-end="url(#arrowCore)"/>
+  <!-- Admin -> Core -->
+  <line x1="710" y1="490" x2="540" y2="400" stroke="#2554C7" stroke-width="2" marker-end="url(#arrowCore)"/>
+  <!-- AI Engine <-> Core (dashed: internal service call, not a user-facing interaction) -->
+  <line x1="250" y1="490" x2="420" y2="400" stroke="#2554C7" stroke-width="2" stroke-dasharray="6 5" marker-end="url(#arrowCore)"/>
+
+  <!-- ===== Connector labels ===== -->
+  <g font-family="Calibri, Arial, sans-serif" font-size="12" fill="#1a1a1a">
+    <rect x="243" y="205" width="230" height="34" fill="white" opacity="0.9"/>
+    <text x="358" y="219" text-anchor="middle">profile, CV, applications ⇄</text>
+    <text x="358" y="234" text-anchor="middle">matches, guidance, chat</text>
+
+    <rect x="503" y="205" width="230" height="34" fill="white" opacity="0.9"/>
+    <text x="618" y="219" text-anchor="middle">job posts, reviews ⇄</text>
+    <text x="618" y="234" text-anchor="middle">ranked, explainable shortlist</text>
+
+    <rect x="503" y="418" width="230" height="34" fill="white" opacity="0.9"/>
+    <text x="618" y="432" text-anchor="middle">moderation, policy ⇄</text>
+    <text x="618" y="447" text-anchor="middle">audit log, AI health</text>
+
+    <rect x="238" y="418" width="240" height="34" fill="white" opacity="0.9"/>
+    <text x="358" y="432" text-anchor="middle">parse · rank · explain · grade</text>
+    <text x="358" y="447" text-anchor="middle">(FastAPI service + Gemini LLM)</text>
+  </g>
+
+  <!-- ===== Core Platform (hub) ===== -->
+  <rect x="370" y="280" width="220" height="120" rx="10" fill="#EAF0FE" stroke="#2554C7" stroke-width="3"/>
+  <text x="480" y="330" text-anchor="middle" font-family="Calibri, Arial, sans-serif" font-size="16" font-weight="700" fill="#15305E">IRAS CORE PLATFORM</text>
+  <text x="480" y="352" text-anchor="middle" font-family="Calibri, Arial, sans-serif" font-size="11.5" font-style="italic" fill="#15305E">authenticated, role-aware</text>
+  <text x="480" y="368" text-anchor="middle" font-family="Calibri, Arial, sans-serif" font-size="11.5" font-style="italic" fill="#15305E">orchestrator (Web API + DB)</text>
+
+  <!-- ===== Candidate ===== -->
+  <rect x="30" y="110" width="220" height="80" rx="8" fill="white" stroke="#1a1a1a" stroke-width="2"/>
+  <text x="140" y="140" text-anchor="middle" font-family="Calibri, Arial, sans-serif" font-size="15" font-weight="700" fill="#1a1a1a">CANDIDATE</text>
+  <text x="140" y="160" text-anchor="middle" font-family="Calibri, Arial, sans-serif" font-size="11.5" font-style="italic" fill="#1a1a1a">uploads CV · builds profile</text>
+  <text x="140" y="175" text-anchor="middle" font-family="Calibri, Arial, sans-serif" font-size="11.5" font-style="italic" fill="#1a1a1a">applies · closes skill gaps</text>
+
+  <!-- Candidate concern bubble -->
+  <ellipse cx="140" cy="50" rx="150" ry="34" fill="white" stroke="#1a1a1a" stroke-width="1.5"/>
+  <text x="140" y="45" text-anchor="middle" font-family="Calibri, Arial, sans-serif" font-size="11.5" font-style="italic" fill="#1a1a1a">"Why was I rejected —</text>
+  <text x="140" y="59" text-anchor="middle" font-family="Calibri, Arial, sans-serif" font-size="11.5" font-style="italic" fill="#1a1a1a">and what should I learn next?"</text>
+  <circle cx="195" cy="78" r="6" fill="white" stroke="#1a1a1a" stroke-width="1.2"/>
+  <circle cx="212" cy="92" r="4" fill="white" stroke="#1a1a1a" stroke-width="1.2"/>
+
+  <!-- ===== Employer ===== -->
+  <rect x="710" y="110" width="220" height="80" rx="8" fill="white" stroke="#1a1a1a" stroke-width="2"/>
+  <text x="820" y="140" text-anchor="middle" font-family="Calibri, Arial, sans-serif" font-size="15" font-weight="700" fill="#1a1a1a">EMPLOYER</text>
+  <text x="820" y="160" text-anchor="middle" font-family="Calibri, Arial, sans-serif" font-size="11.5" font-style="italic" fill="#1a1a1a">posts jobs · reviews applicants</text>
+  <text x="820" y="175" text-anchor="middle" font-family="Calibri, Arial, sans-serif" font-size="11.5" font-style="italic" fill="#1a1a1a">schedules interviews</text>
+
+  <!-- Employer concern bubble -->
+  <ellipse cx="820" cy="50" rx="150" ry="34" fill="white" stroke="#1a1a1a" stroke-width="1.5"/>
+  <text x="820" y="45" text-anchor="middle" font-family="Calibri, Arial, sans-serif" font-size="11.5" font-style="italic" fill="#1a1a1a">"300 applicants —</text>
+  <text x="820" y="59" text-anchor="middle" font-family="Calibri, Arial, sans-serif" font-size="11.5" font-style="italic" fill="#1a1a1a">who is actually right for this?"</text>
+  <circle cx="765" cy="78" r="6" fill="white" stroke="#1a1a1a" stroke-width="1.2"/>
+  <circle cx="748" cy="92" r="4" fill="white" stroke="#1a1a1a" stroke-width="1.2"/>
+
+  <!-- ===== Administrator ===== -->
+  <rect x="710" y="490" width="220" height="80" rx="8" fill="white" stroke="#1a1a1a" stroke-width="2"/>
+  <text x="820" y="520" text-anchor="middle" font-family="Calibri, Arial, sans-serif" font-size="15" font-weight="700" fill="#1a1a1a">ADMINISTRATOR</text>
+  <text x="820" y="540" text-anchor="middle" font-family="Calibri, Arial, sans-serif" font-size="11.5" font-style="italic" fill="#1a1a1a">moderates jobs · audits</text>
+  <text x="820" y="555" text-anchor="middle" font-family="Calibri, Arial, sans-serif" font-size="11.5" font-style="italic" fill="#1a1a1a">monitors AI service health</text>
+
+  <!-- Admin concern bubble -->
+  <ellipse cx="820" cy="632" rx="155" ry="32" fill="white" stroke="#1a1a1a" stroke-width="1.5"/>
+  <text x="820" y="627" text-anchor="middle" font-family="Calibri, Arial, sans-serif" font-size="11.5" font-style="italic" fill="#1a1a1a">"Is the AI behaving —</text>
+  <text x="820" y="641" text-anchor="middle" font-family="Calibri, Arial, sans-serif" font-size="11.5" font-style="italic" fill="#1a1a1a">and can I prove it?"</text>
+  <circle cx="765" cy="602" r="6" fill="white" stroke="#1a1a1a" stroke-width="1.2"/>
+  <circle cx="748" cy="588" r="4" fill="white" stroke="#1a1a1a" stroke-width="1.2"/>
+
+  <!-- ===== AI / ML Engine ===== -->
+  <rect x="30" y="490" width="220" height="80" rx="8" fill="#F3F3F3" stroke="#1a1a1a" stroke-width="2" stroke-dasharray="5 4"/>
+  <text x="140" y="520" text-anchor="middle" font-family="Calibri, Arial, sans-serif" font-size="15" font-weight="700" fill="#1a1a1a">AI / ML ENGINE</text>
+  <text x="140" y="540" text-anchor="middle" font-family="Calibri, Arial, sans-serif" font-size="11.5" font-style="italic" fill="#1a1a1a">FastAPI service +</text>
+  <text x="140" y="555" text-anchor="middle" font-family="Calibri, Arial, sans-serif" font-size="11.5" font-style="italic" fill="#1a1a1a">Gemini LLM + fit-classifier</text>
+  <text x="140" y="590" text-anchor="middle" font-family="Calibri, Arial, sans-serif" font-size="10.5" font-style="italic" fill="#555555">reached only through the Core platform — never called directly by users</text>
+
+</svg>

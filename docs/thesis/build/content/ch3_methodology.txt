@@ -1,0 +1,128 @@
+#C CHAPTER 03 - METHODOLOGY
+
+# 3.1 Research Paradigm
+
+The pragmatic research paradigm is adopted for this study. Pragmatism suits this research since the study aims to address a real-world recruitment problem by designing and developing a software artifact.
+
+The paradigm allows the system to be assessed using multiple types of evidence. Alongside human-centred evidence such as usability, transparency, usefulness, and user satisfaction, technical evidence such as matching accuracy, candidate-ranking relevance, skill-gap identification accuracy, processing time, CV-generation correctness, and feedback quality can all be taken into account. This is appropriate given that IRAS must be assessed both technically and from the user's standpoint.
+
+Pragmatism is also relevant because recruitment automation is a real-world issue that both employers and candidates must contend with. Businesses want faster, more consistent, more detailed, and more predictable shortlisting, while candidates want transparency, feedback, skill advice, and communication. The work in this thesis is therefore directed toward developing and testing a practical solution that addresses these practical recruitment-process constraints.
+
+# 3.2 Research Approach
+
+The research approach used in this study is a mixed method guided by practical reasoning. The qualitative component includes the literature review, analysis of existing recruitment processes, identification of user requirements, and feedback on the usability, transparency, and candidate experience of the system. The quantitative component includes analysis of candidate-ranking accuracy, resume-data extraction accuracy, match relevance, skill-gap identification accuracy, process efficiency, CV-generation correctness, and user satisfaction ratings.
+
+Both deductive and inductive reasoning are used in this research. Deductive reasoning is applied when existing theories, literature-review techniques, and findings are used to design the system — for example, concepts from NLP, semantic similarity, Large Language Models, scoring-based ranking, and Design Science Research Methodology guide the system design. Inductive reasoning is applied when observations from prototype testing, system output, and user feedback are analyzed to enhance the system. This combination is appropriate because the research involves designing, developing, testing, and improving a software artifact based on evaluation results.
+
+This mixed approach also determined how disagreement between qualitative/practical and quantitative evidence would be resolved during the project, which mattered in practice at least once: Section 6.4's model-selection decision is a direct example. The quantitative evidence favoured XGBoost (highest accuracy), but a practical, engineering-grounded constraint discovered during integration testing — a cross-platform model-serialization failure — initially overrode it in favour of Logistic Regression. A purely quantitative research approach would have had no principled way to make that interim call; the pragmatic paradigm adopted in Section 3.1 explicitly allows deployment reliability, a form of practical evidence, to outweigh a small accuracy advantage. The same pragmatic stance then treated that constraint as something to keep working on rather than a fixed trade-off: once the serialization failure was traced to a portability limitation of one specific serialization path and worked around by exporting the model through its own native format instead, the practical obstacle was removed and the quantitatively-favoured model (XGBoost) was deployed after all — evidence that, under this paradigm, a practical constraint need not permanently override the strongest quantitative result, only until it is itself resolved.
+
+# 3.3 Research Strategy
+
+This study uses Design Science Research Methodology (DSRM) as its research strategy. This methodology suits software engineering research since it is concerned with the design, development, demonstration, and evaluation of artifacts, and the artifact in this study is the Intelligent Recruitment Automation System (IRAS).
+
+DSRM is justified because the research addresses a practical recruitment problem and proposes a technological solution to it. It structures the study around the key stages of problem identification, goal setting, design and development, demonstration, evaluation, and communication. Since the purpose of this research is to create and test an automated recruitment system, DSRM offers a structured way to develop the system and evaluate its performance.
+
+The system is delivered through three workflows — Candidate, Employer, and Admin — each automated and web-based, with AI-based and automated capability for creating job descriptions, managing resumes, shortlisting applications, ranking candidates, conducting skill-gap analysis, matching jobs with candidates automatically, creating CVs, scheduling interviews, providing feedback on resumes, notifying candidates, providing knowledge base support, and assisting candidates through a recruitment chatbot.
+
+# 3.4 Fact Collection Mechanisms
+
+Several methods are employed in this research to collect the facts needed for designing, developing, and evaluating the system.
+
+First, a literature review is carried out using research papers, journal articles, conference papers, and industry reports related to AI in recruitment, CV screening, matching with job posts, LLM-based text generation, skill-gap analysis, recruitment chatbots, CV generation, interview scheduling, notifications, and fair AI hiring. This helps determine what solutions already exist, their limitations, and the gaps in the research.
+
+Second, secondary data is analyzed to understand resume and job-description structure, drawing on resume datasets, resume entity-recognition datasets, publicly available resume samples, publicly available job descriptions, and open-source recruitment datasets. This information supports understanding of resume structure, skill extraction, job requirements, and matching techniques.
+
+Third, synthetic data is used for system testing. System functions are tested using synthetic candidate profiles, resumes, job postings, applications, interview records, and feedback samples, without sharing actual personal data — an important consideration given that recruitment data is sensitive information belonging to both candidates and employers.
+
+Fourth, prototype-based testing gathers technical performance facts, covering resume-parsing accuracy, candidate-ranking relevance, skill-gap identification, job-candidate matching, quality of AI-generated job descriptions, correctness of CV generation, scheduling functionality, feedback quality, notification delivery, and chatbot response relevance.
+
+Fifth, user feedback is gathered from sample users including students, potential candidates, employers, and academic evaluators. This feedback assesses usability, transparency, usefulness, candidate experience, and overall satisfaction with the system.
+
+# 3.5 Research Methodology Execution Workflow
+
+The Research Methodology Execution Workflow (Figure 3.1) gives an understanding of how the research is executed, from problem identification through to communication. This workflow is based on the Design Science Research framework and customized to fit the recommended system development process.
+
+FIG:dsrm_workflow.png|Figure 3.1|Design Science Research Methodology Execution Workflow. The diagram shows the six sequential stages followed in this research — Problem Identification, Relevance Justification, Comparative Analysis, Objectives Finalization, Design and Development, and Evaluation and Communication — with each box annotated underneath by the concrete evidence base used at that stage, for example recruitment pain points at the identification stage and prototype and data handling at the design and development stage.
+
+TCAP:Table 3.1|Research Methodology Execution Workflow.
+| Stage | Activity | How It Is Addressed in This Research |
+| Problem Identification | Identify recruitment issues | Manual screening, poor feedback, inconsistent ranking, weak transparency, interview coordination issues, and fragmented tools are identified |
+| Relevance Justification | Justify why the problem matters | Recruitment affects both employers and candidates; AI adoption is increasing, but explainability, fairness, and transparency are required |
+| Comparative Analysis | Compare existing studies | Literature on resume screening, job matching, LLMs, feedback generation, user profiling, CV generation, interview scheduling, notifications, and chatbots is reviewed |
+| Gap Justification | Identify missing areas | Lack of a unified system, limited candidate feedback, weak skill-gap explanation, limited chatbot lifecycle support, and lack of integrated CV/interview support are identified |
+| Objective Definition | Define research objectives | Objectives are structured under identify, analyze, design/develop, and evaluate stages |
+| Design | Design proposed system | Candidate, Employer, and Admin workflows, system architecture, database design, and AI-assisted modules are designed |
+| Development | Implement system modules | Web frontend, backend APIs, database, AI service integration, authentication, CV generation, notification support, and chatbot integration are developed |
+| Data Management | Prepare and handle data | Resume data, job descriptions, skill datasets, candidate profiles, and synthetic test records are cleaned and structured |
+| Demonstration | Show working prototype | Main workflows are demonstrated using sample users, test resumes, job posts, applications, CV outputs, and interview records |
+| Evaluation | Evaluate the system | Matching relevance, ranking accuracy, skill-gap identification, CV-generation correctness, processing efficiency, usability, feedback quality, and chatbot relevance are measured |
+| Communication | Present research outcomes | Interim reports, final thesis, presentation slides, system screenshots, and prototype demonstration are prepared |
+
+## 3.5.1 Problem Identification
+
+The problem is significant because recruitment shapes both organizational performance and career opportunities. Finding the right candidate, minimizing hiring delays, and reaching informed decisions all depend on a streamlined, precise, and systematic recruitment process. Candidates should also be offered clear recruitment practice, information on the outcome of a job application, guidance on closing skill gaps, feedback on their resume or CV, and support for enhancing their employability.
+
+This is also a significant problem because AI is increasingly incorporated into recruitment. AI can enhance efficiency by creating job descriptions, processing resumes, ranking candidates, matching job and candidate skills, identifying skill gaps, providing feedback, and supporting candidates through a chatbot. Recent studies, however, indicate that careful design and monitoring of AI-based recruitment systems is needed to decrease bias, increase explainability, and maintain human control over recruitment decisions [4], [7].
+
+## 3.5.2 Relevance Justification
+
+The problem is important because recruitment directly affects organizational performance and candidates' career opportunities. Organizations require an efficient, accurate, and consistent recruitment process to identify suitable candidates, reduce hiring delays, and improve decision-making. Candidates also require transparent recruitment processes that help them understand application outcomes, identify skill gaps, improve their resumes or CVs, and develop their employability.
+
+This issue is significant because Artificial Intelligence is increasingly used in recruitment. AI can improve efficiency through job description generation, resume handling, candidate ranking, job-candidate matching, skill-gap analysis, feedback generation, and chatbot support. Recent studies, however, show that AI-based recruitment systems must be carefully designed and monitored to reduce bias, improve explainability, and maintain human control over recruitment decisions [4], [7].
+
+## 3.5.3 Comparative Analysis and Gap Justification
+
+The comparative analysis is carried out through the literature review presented in Chapter 2. Existing methods and systems are discussed with respect to job description generation, resume handling, application shortlisting, candidate ranking, skill-gap identification, candidate feedback, user profiling, automated job-candidate matching, CV generation, interview scheduling, notifications, knowledge base support, and chatbot support.
+
+The need for this research is warranted because most existing methods engage with only a single recruitment task at a time. Some consider only resume screening, others only job matching, job description generation, or chatbot assistance, but few systems deliver a single, role-based, transparent platform for recruitment automation combining employer-side automation, candidate-side support, and administrator monitoring within one system.
+
+## 3.5.4 Define and Finalize Objectives
+
+The research objectives were set once the recruitment issues had been identified and the research gap established through the literature review. The objectives include the primary phases of the study: determining the limitations of existing systems, analyzing systems and technologies, designing and developing the proposed system, and evaluating the final prototype.
+
+The finalized objectives are: identifying the limitations of traditional and AI-assisted recruitment systems; analyzing existing literature and technologies relevant to intelligent recruitment automation; designing and developing IRAS with candidate, employer, and admin roles; and evaluating the system against matching relevance, ranking accuracy, skill-gap identification, correctness of CV generation, quality of feedback, usefulness of the chatbot, usability, and transparency.
+
+## 3.5.5 Design / Development / Data Management and Handling
+
+This stage covers system architecture design, database design, user-interface design, backend API development, AI-service integration, and chatbot development. The system comprises authentication and role management, candidate profile management, employer profile management, AI-assisted job-description generation, resume upload and handling, candidate ranking and application shortlisting, skill-gap analysis, automated job-candidate matching, CV generation, interview scheduling, candidate feedback generation, recruitment-specific chatbot support, notification management, admin management, reporting, audit logging, and system monitoring.
+
+Data management involves gathering and formatting sample resumes, job descriptions, skill lists, candidate profiles, application records, interview records, feedback samples, and chatbot question-and-answer content. Wherever applicable, recruitment data is anonymized or synthesized so that it does not contain sensitive information about a real individual. Data pre-processing involves text extraction, text cleaning, text normalization, entity recognition, skill mapping, and structuring the data into formats appropriate for profile management, profile matching, profile ranking, skill-gap identification, feedback generation, and chatbot support.
+
+## 3.5.6 Evaluation and Communication
+
+Evaluation is carried out to determine the effectiveness, accuracy, and usability of the proposed system. Precision, recall, F1-score, ranking accuracy, and relevance are used to evaluate candidate ranking and matching. Resume parsing is evaluated by comparing extracted data against manually verified data, and skill-gap analysis is evaluated by comparing manually verified skills against those extracted from the resume.
+
+The usability, usefulness, and correctness of AI-generated job descriptions, feedback, CV generation, interview scheduling, notifications, and chatbot responses are tested for relevance, and feedback is gathered from candidates, employers, and academic assessors. The communication phase spans Interim Submission 01, Interim Submission 02, this final thesis, the project presentation, and the system demonstration.
+
+# 3.6 Project Management Methodology
+
+The chosen project management methodology for this research is Scrum. Scrum is appropriate because this project is software development involving multiple modules, requirement changes, AI integration, and continuous improvement; the software spans Candidate, Employer, and Admin functionality, each of which can be worked on and tested incrementally.
+
+Scrum enables the project to be broken into sprints, each concentrating on a particular part of the software — authentication, candidate profile, job posting, resume parser, AI ranking algorithm, skill-gap analysis, chatbot, admin functionality, and report generation. Scrum also accommodates review and continuous improvement, which is important in a research prototype. Kanban would also support task management, but Scrum was judged more appropriate here since the project has distinct phases of development and deliverables.
+
+## 3.6.1 Project Timeline
+
+The project timeline is designed around the major research and development activities and is synchronized with proposal writing, literature review, data preparation, design, development, evaluation, and documentation.
+
+FIG:project_timeline.png|Figure 3.2|Project Timeline. The Gantt-style chart shows six project phases spanning the academic year — Inception and Planning, Data Acquisition and Preparation, Core Model Development, System Development and Integration, Evaluation and Testing, and Final Documentation and Closure — plotted month by month from November through September, with each phase broken down into its constituent tasks such as the job-description generator, the CV screening and ranking engine, the chatbot assistant, and the skill-gap analysis and feedback module.
+
+## 3.6.2 Ethical Considerations
+
+Ethical considerations are significant because the recruitment process handles sensitive candidate and employer data and can influence a person's job opportunities. The proposed system must ensure that the final hiring decision is made by a human rather than by AI alone, and that AI-generated feedback assists recruiters without discriminating against applicants.
+
+TCAP:Table 3.2|Ethical Considerations.
+| Ethical Area | Risk | Mitigation |
+| Candidate Privacy | Resumes contain personal and sensitive information | Use anonymized or synthetic data where possible |
+| Data Security | Unauthorized access to candidate or employer data | Apply authentication, role-based authorization, secure file handling, and protected storage |
+| Informed Consent | Users may not clearly understand how their data is used | Inform users about data usage for matching, ranking, feedback, notifications, and chatbot support |
+| Bias in AI | AI ranking or feedback may unfairly affect candidates | Focus evaluation on relevant skills, qualifications, experience, and explainable scoring |
+| Transparency | Candidates may not understand application outcomes | Provide feedback, match explanations, and skill gap details |
+| Human Oversight | AI may be treated as the final decision-maker | Use AI as a decision-support tool while keeping final decisions under employer control |
+| Chatbot Misuse | Chatbot may answer irrelevant or unsuitable questions | Restrict chatbot responses to recruitment-related and knowledge-base-supported content |
+| Secondary Data Use | Public datasets may include sensitive information | Use ethical, anonymized, or synthetic datasets only |
+| CV and Resume Handling | Generated CVs and uploaded resumes may expose private details | Limit access to the relevant candidate and authorized employer only |
+| Audit and Accountability | System actions may not be traceable | Maintain audit logs for administrative monitoring and accountability |
+
+# 3.7 Chapter Summary
+
+This chapter described the research methodology used to develop IRAS. The study adopts the pragmatic research paradigm and a mixed research method, and uses Design Science Research as its research strategy since it concerns the design and evaluation of a software artifact. The chapter also described the fact-gathering methods, the methodology execution workflow, the project management methodology, the project timeline, and the ethical considerations that shaped the research. Chapter 4 builds on this methodology by translating the research objectives into a concrete System Requirement Specification for IRAS.
