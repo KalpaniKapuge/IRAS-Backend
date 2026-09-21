@@ -2,6 +2,7 @@
   <Project Path="IRAS.API/IRAS.API.csproj" />
   <Project Path="IRAS.Application/IRAS.Application.csproj" />
   <Project Path="IRAS.Domain/IRAS.Domain.csproj" />
+  <Project Path="IRAS.E2ETests/IRAS.E2ETests.csproj" />
   <Project Path="IRAS.Infrastructure/IRAS.Infrastructure.csproj" />
   <Project Path="IRAS.Tests/IRAS.Tests.csproj" />
 </Solution>

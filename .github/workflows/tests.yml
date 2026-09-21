@@ -1,0 +1,45 @@
+name: Tests
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore
+        run: dotnet restore IRAS.slnx
+
+      - name: Build
+        run: dotnet build IRAS.slnx --configuration Release --no-restore
+
+      - name: Unit tests
+        run: dotnet test IRAS.Tests/IRAS.Tests.csproj --configuration Release --no-build --logger "trx;LogFileName=iras-unit.trx"
+
+      - name: Selenium E2E tests
+        env:
+          IRAS_E2E_BASE_URL: ${{ vars.IRAS_E2E_BASE_URL }}
+          IRAS_E2E_ADMIN_EMAIL: ${{ secrets.IRAS_E2E_ADMIN_EMAIL }}
+          IRAS_E2E_ADMIN_PASSWORD: ${{ secrets.IRAS_E2E_ADMIN_PASSWORD }}
+          IRAS_E2E_HEADLESS: true
+        run: dotnet test IRAS.E2ETests/IRAS.E2ETests.csproj --configuration Release --logger "trx;LogFileName=iras-e2e.trx"
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: '**/TestResults/*.trx'

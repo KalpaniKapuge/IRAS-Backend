@@ -1,2 +1,9 @@
 appsettings.json
 publish/
+bin/
+obj/
+TestResults/
+test-results/
+*.trx
+*.coverage
+*.coveragexml

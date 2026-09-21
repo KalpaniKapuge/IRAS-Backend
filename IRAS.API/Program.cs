@@ -321,7 +321,10 @@ using (var scope = app.Services.CreateScope())
     // Applies any pending migrations on startup — needed for hosts like MonsterASP.NET
     // where there's no separate CI step to run `dotnet ef database update` against the
     // remote connection string before the app starts.
-    await db.Database.MigrateAsync();
+    if (db.Database.IsRelational())
+    {
+        await db.Database.MigrateAsync();
+    }
     await DataSeeder.SeedAsync(
         db,
         builder.Configuration["Seed:AdminEmail"] ?? "admin@iras.local",

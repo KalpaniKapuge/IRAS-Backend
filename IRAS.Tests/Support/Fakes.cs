@@ -47,6 +47,8 @@ internal sealed class FakeScoringService : IScoringService
         Task.FromResult(new MatchSignals(0.8m, 0.9m));
     public Task<Dictionary<int, MatchSignals>> ComputeMatchSignalsAsync(Job job, IReadOnlyList<(int CandidateId, string ResumeText)> candidates, CancellationToken ct) =>
         Task.FromResult(candidates.ToDictionary(c => c.CandidateId, _ => new MatchSignals(0.8m, 0.9m)));
+    public Task<Dictionary<int, MatchSignals>> ComputeMatchSignalsForCandidateAsync(int candidateId, string resumeText, IReadOnlyList<Job> jobs, CancellationToken ct) =>
+        Task.FromResult(jobs.ToDictionary(j => j.JobId, _ => new MatchSignals(0.8m, 0.9m)));
 }
 
 internal sealed class FakeFeedbackService : IFeedbackService
