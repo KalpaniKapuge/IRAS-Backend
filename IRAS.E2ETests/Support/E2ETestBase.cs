@@ -41,4 +41,14 @@ public abstract class E2ETestBase : IClassFixture<BrowserFixture>
             return element.Displayed ? element : null;
         });
     }
+
+    protected IWebElement WaitForAnyInput(Func<IWebElement, bool> predicate, int seconds = 10)
+    {
+        var wait = new WebDriverWait(Driver, TimeSpan.FromSeconds(seconds));
+        return wait.Until(driver =>
+        {
+            return driver.FindElements(By.TagName("input"))
+                .FirstOrDefault(input => input.Displayed && predicate(input));
+        });
+    }
 }

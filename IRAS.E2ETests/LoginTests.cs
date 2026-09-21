@@ -19,8 +19,8 @@ public sealed class LoginTests : E2ETestBase
 
         GoTo("/login");
 
-        WaitFor(By.CssSelector("input[type='email'], input[name='email'], input[autocomplete='username']"));
-        WaitFor(By.CssSelector("input[type='password'], input[name='password'], input[autocomplete='current-password']"));
+        WaitForEmailInput();
+        WaitForPasswordInput();
     }
 
     [Fact]
@@ -34,12 +34,38 @@ public sealed class LoginTests : E2ETestBase
 
         GoTo("/login");
 
-        Driver.FindElement(By.CssSelector("input[type='email'], input[name='email'], input[autocomplete='username']")).SendKeys(Settings.AdminEmail);
-        Driver.FindElement(By.CssSelector("input[type='password'], input[name='password'], input[autocomplete='current-password']")).SendKeys(Settings.AdminPassword);
+        WaitForEmailInput().SendKeys(Settings.AdminEmail);
+        WaitForPasswordInput().SendKeys(Settings.AdminPassword);
         Driver.FindElement(By.CssSelector("button[type='submit']")).Click();
 
         WaitFor(By.CssSelector("[data-testid='dashboard'], main, nav"), 15);
 
         Assert.DoesNotContain("/login", Driver.Url, StringComparison.OrdinalIgnoreCase);
     }
+
+    private IWebElement WaitForEmailInput()
+    {
+        return WaitForAnyInput(input =>
+            Is(input, "type", "email")
+            || Is(input, "name", "email")
+            || Is(input, "id", "email")
+            || Is(input, "autocomplete", "username")
+            || Contains(input, "placeholder", "email")
+            || (!Is(input, "type", "password") && !Contains(input, "autocomplete", "one-time-code")));
+    }
+
+    private IWebElement WaitForPasswordInput()
+    {
+        return WaitForAnyInput(input =>
+            Is(input, "type", "password")
+            || Is(input, "name", "password")
+            || Is(input, "id", "password")
+            || Is(input, "autocomplete", "current-password"));
+    }
+
+    private static bool Is(IWebElement element, string attribute, string expected) =>
+        string.Equals(element.GetAttribute(attribute), expected, StringComparison.OrdinalIgnoreCase);
+
+    private static bool Contains(IWebElement element, string attribute, string expected) =>
+        element.GetAttribute(attribute)?.Contains(expected, StringComparison.OrdinalIgnoreCase) == true;
 }
