@@ -30,6 +30,7 @@ public abstract class E2ETestBase : IClassFixture<BrowserFixture>
     protected void GoTo(string path)
     {
         Driver.Navigate().GoToUrl(Settings.BuildUri(path));
+        WaitForPageReady();
     }
 
     protected IWebElement WaitFor(By selector, int seconds = 10)
@@ -42,13 +43,47 @@ public abstract class E2ETestBase : IClassFixture<BrowserFixture>
         });
     }
 
-    protected IWebElement WaitForAnyInput(Func<IWebElement, bool> predicate, int seconds = 10)
+    protected IWebElement WaitForAnyInput(Func<IWebElement, bool> predicate, int seconds = 30)
     {
         var wait = new WebDriverWait(Driver, TimeSpan.FromSeconds(seconds));
-        return wait.Until(driver =>
+        try
         {
-            return driver.FindElements(By.TagName("input"))
-                .FirstOrDefault(input => input.Displayed && predicate(input));
+            return wait.Until(driver =>
+            {
+                return driver.FindElements(By.TagName("input"))
+                    .FirstOrDefault(input => input.Displayed && predicate(input));
+            });
+        }
+        catch (WebDriverTimeoutException ex)
+        {
+            throw new WebDriverTimeoutException(
+                $"{ex.Message}{Environment.NewLine}{DescribeCurrentPage()}",
+                ex);
+        }
+    }
+
+    private void WaitForPageReady()
+    {
+        var wait = new WebDriverWait(Driver, TimeSpan.FromSeconds(30));
+        wait.Until(driver =>
+        {
+            if (driver is not IJavaScriptExecutor js)
+            {
+                return true;
+            }
+
+            return string.Equals(js.ExecuteScript("return document.readyState")?.ToString(), "complete", StringComparison.OrdinalIgnoreCase);
         });
+    }
+
+    private string DescribeCurrentPage()
+    {
+        var body = Driver.FindElements(By.TagName("body")).FirstOrDefault()?.Text ?? string.Empty;
+        if (body.Length > 500)
+        {
+            body = body[..500];
+        }
+
+        return $"Current URL: {Driver.Url}{Environment.NewLine}Title: {Driver.Title}{Environment.NewLine}Body preview: {body}";
     }
 }
