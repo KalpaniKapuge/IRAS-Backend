@@ -31,7 +31,7 @@ jobs:
 
       - name: Selenium E2E tests
         env:
-          IRAS_E2E_BASE_URL: ${{ vars.IRAS_E2E_BASE_URL }}
+          IRAS_E2E_BASE_URL: ${{ vars.IRASE2EBASEURL }}
           IRAS_E2E_ADMIN_EMAIL: ${{ secrets.IRAS_E2E_ADMIN_EMAIL }}
           IRAS_E2E_ADMIN_PASSWORD: ${{ secrets.IRAS_E2E_ADMIN_PASSWORD }}
           IRAS_E2E_HEADLESS: true
