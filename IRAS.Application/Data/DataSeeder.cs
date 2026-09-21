@@ -13,7 +13,8 @@ namespace IRAS.Application.Data
         public static async Task SeedAsync(IrasDbContext db, string adminEmail, string adminPassword)
         {
             // ---- Admin account ----
-            var admin = await db.Users.FirstOrDefaultAsync(u => u.Role == UserRole.Admin);
+            adminEmail = adminEmail.Trim();
+            var admin = await db.Users.FirstOrDefaultAsync(u => u.Email == adminEmail);
             if (admin is null)
             {
                 admin = new User
@@ -24,6 +25,13 @@ namespace IRAS.Application.Data
                     IsActive = true
                 };
                 db.Users.Add(admin);
+                await db.SaveChangesAsync();
+            }
+            else
+            {
+                admin.PasswordHash = BCrypt.Net.BCrypt.HashPassword(adminPassword);
+                admin.Role = UserRole.Admin;
+                admin.IsActive = true;
                 await db.SaveChangesAsync();
             }
 
