@@ -17,7 +17,13 @@ public sealed class LoginTests : E2ETestBase
             return;
         }
 
+        ClearBrowserState();
         GoTo("/login");
+
+        if (IsAuthenticatedArea())
+        {
+            return;
+        }
 
         WaitForEmailInput();
         WaitForPasswordInput();
@@ -32,6 +38,7 @@ public sealed class LoginTests : E2ETestBase
             return;
         }
 
+        ClearBrowserState();
         GoTo("/login");
 
         WaitForEmailInput().SendKeys(Settings.AdminEmail);
@@ -41,6 +48,15 @@ public sealed class LoginTests : E2ETestBase
         WaitFor(By.CssSelector("[data-testid='dashboard'], main, nav"), 15);
 
         Assert.DoesNotContain("/login", Driver.Url, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private bool IsAuthenticatedArea()
+    {
+        var bodyText = Driver.FindElements(By.TagName("body")).FirstOrDefault()?.Text ?? string.Empty;
+        return Driver.Url.Contains("/admin", StringComparison.OrdinalIgnoreCase)
+            || Driver.Url.Contains("/dashboard", StringComparison.OrdinalIgnoreCase)
+            || bodyText.Contains("Dashboard", StringComparison.OrdinalIgnoreCase)
+            || bodyText.Contains("Sign out", StringComparison.OrdinalIgnoreCase);
     }
 
     private IWebElement WaitForEmailInput()

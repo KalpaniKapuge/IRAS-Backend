@@ -33,6 +33,23 @@ public abstract class E2ETestBase : IClassFixture<BrowserFixture>
         WaitForPageReady();
     }
 
+    protected void ClearBrowserState()
+    {
+        if (!Settings.IsConfigured)
+        {
+            return;
+        }
+
+        Driver.Navigate().GoToUrl(Settings.BuildUri("/"));
+        WaitForPageReady();
+        Driver.Manage().Cookies.DeleteAllCookies();
+
+        if (Driver is IJavaScriptExecutor js)
+        {
+            js.ExecuteScript("window.localStorage.clear(); window.sessionStorage.clear();");
+        }
+    }
+
     protected IWebElement WaitFor(By selector, int seconds = 10)
     {
         var wait = new WebDriverWait(Driver, TimeSpan.FromSeconds(seconds));
