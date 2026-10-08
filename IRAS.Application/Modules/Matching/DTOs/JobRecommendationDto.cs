@@ -9,5 +9,6 @@ namespace IRAS.Application.Modules.Matching.DTOs
         public decimal SkillMatch { get; set; }
         public decimal SemanticSimilarity { get; set; }
         public decimal? MlFitScore { get; set; }
+        public bool HasApplied { get; set; }
     }
 }

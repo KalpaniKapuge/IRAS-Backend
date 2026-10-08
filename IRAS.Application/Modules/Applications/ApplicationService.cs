@@ -26,7 +26,10 @@ namespace IRAS.Application.Modules.Applications
         // Experience/education match are computed and stored for transparency in the UI
         // but deliberately excluded from TotalScore — see IScoringService.ComputeTotalScore
         // for the two-input weighted formula that's actually used to rank applications.
-        private static readonly Expression<Func<AppEntity, ApplicationDto>> ToApplicationDto = a => new ApplicationDto
+        private static readonly ApplicationStatus[] TerminalStatuses =
+            { ApplicationStatus.Rejected, ApplicationStatus.Hired, ApplicationStatus.Withdrawn };
+
+        private static readonly Expression<Func<AppEntity, ApplicationDto>> ToApplicationDtoProjection = a => new ApplicationDto
         {
             ApplicationId = a.ApplicationId,
             JobId = a.JobId,
@@ -48,9 +51,6 @@ namespace IRAS.Application.Modules.Applications
                 Suggestion = g.Suggestion
             }).ToList()
         };
-
-        private static readonly ApplicationStatus[] TerminalStatuses =
-            { ApplicationStatus.Rejected, ApplicationStatus.Hired, ApplicationStatus.Withdrawn };
 
         private readonly IrasDbContext _db;
         private readonly IScoringService _scoring;
@@ -110,9 +110,10 @@ namespace IRAS.Application.Modules.Applications
             var experienceMatch = _scoring.ComputeExperienceMatch(candidate.TotalExpYears, job.MinExpYears);
             var educationMatch = _scoring.ComputeEducationMatch(candidate.EducationLevel, job.EducationReq);
             var matchSignals = await _scoring.ComputeMatchSignalAsync(candidateId, resume.ParsedText!, job, ct);
+            var semanticSimilarity = EffectiveResumeRelevance(matchSignals.SemanticSimilarity, skillMatch);
             var assessmentScore = await _assessments.GetScoreAsync(candidateId, request.JobId, ct);
 
-            var totalScore = _scoring.ComputeTotalScore(skillMatch, matchSignals.SemanticSimilarity, matchSignals.MlFitScore, assessmentScore);
+            var totalScore = _scoring.ComputeTotalScore(skillMatch, semanticSimilarity, matchSignals.MlFitScore, assessmentScore);
 
             var application = new AppEntity
             {
@@ -124,7 +125,7 @@ namespace IRAS.Application.Modules.Applications
                 SkillMatch = skillMatch,
                 ExperienceMatch = experienceMatch,
                 EducationMatch = educationMatch,
-                SemanticSimilarity = matchSignals.SemanticSimilarity,
+                SemanticSimilarity = semanticSimilarity,
                 AssessmentScore = assessmentScore
             };
             _db.Applications.Add(application);
@@ -167,17 +168,26 @@ namespace IRAS.Application.Modules.Applications
                 await _db.SaveChangesAsync(ct);
             }
 
-            return await _db.Applications.Where(a => a.ApplicationId == application.ApplicationId)
-                .Select(ToApplicationDto).FirstAsync(ct);
+            var created = await _db.Applications
+                .Where(a => a.ApplicationId == application.ApplicationId)
+                .Select(ToApplicationDtoProjection)
+                .FirstAsync(ct);
+            NormalizeScores(created);
+            return created;
         }
 
         public async Task<List<ApplicationDto>> GetMyApplicationsAsync(int candidateId, CancellationToken ct)
         {
-            return await _db.Applications
+            var applications = await _db.Applications
                 .Where(a => a.CandidateId == candidateId)
                 .OrderByDescending(a => a.AppliedAt)
-                .Select(ToApplicationDto)
+                .Select(ToApplicationDtoProjection)
                 .ToListAsync(ct);
+
+            foreach (var application in applications)
+                NormalizeScores(application);
+
+            return applications;
         }
 
         public async Task<List<RankedApplicantDto>> GetRankedApplicantsAsync(int employerId, int jobId, CancellationToken ct)
@@ -219,6 +229,9 @@ namespace IRAS.Application.Modules.Applications
             // they're filled in after materializing rather than inside the Select above.
             foreach (var applicant in applicants)
             {
+                applicant.SemanticSimilarity = EffectiveResumeRelevance(applicant.SemanticSimilarity, applicant.SkillMatch);
+                applicant.TotalScore = _scoring.ComputeTotalScore(
+                    applicant.SkillMatch, applicant.SemanticSimilarity, assessmentScore: applicant.AssessmentScore);
                 applicant.TotalMarks = _scoring.ComputeTotalMarks(
                     applicant.SkillMatch, applicant.ExperienceMatch, applicant.EducationMatch,
                     applicant.SemanticSimilarity, applicant.AssessmentScore);
@@ -229,6 +242,16 @@ namespace IRAS.Application.Modules.Applications
             // the opaque weighted TotalScore (see ComputeTotalMarks for why they differ).
             return applicants.OrderByDescending(a => a.TotalMarks).ToList();
         }
+
+        private void NormalizeScores(ApplicationDto application)
+        {
+            application.SemanticSimilarity = EffectiveResumeRelevance(application.SemanticSimilarity, application.SkillMatch);
+            application.TotalScore = _scoring.ComputeTotalScore(
+                application.SkillMatch, application.SemanticSimilarity, assessmentScore: application.AssessmentScore);
+        }
+
+        private static decimal EffectiveResumeRelevance(decimal semanticSimilarity, decimal skillMatch) =>
+            semanticSimilarity > 0m ? semanticSimilarity : skillMatch;
 
         // Every resume saved through the currently-registered IFileStorage (Supabase or Local)
         // already returns a full absolute URL from SaveAsync — so a bare relative FileUrl can

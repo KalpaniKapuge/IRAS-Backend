@@ -153,6 +153,7 @@ namespace IRAS.Application.Modules.Matching
                     CompanyName = m.Job.Employer.CompanyName,
                     MatchScore = m.MatchScore,
                     ThresholdPassed = m.ThresholdPassed,
+                    HasApplied = _db.Applications.Any(a => a.CandidateId == candidateId && a.JobId == m.JobId),
                     MatchedAt = m.MatchedAt
                 })
                 .ToListAsync(ct);
@@ -187,6 +188,11 @@ namespace IRAS.Application.Modules.Matching
                 .Include(j => j.RequiredSkills)
                 .Include(j => j.Employer)
                 .ToListAsync(ct);
+            var appliedJobIds = await _db.Applications
+                .Where(a => a.CandidateId == candidateId)
+                .Select(a => a.JobId)
+                .ToListAsync(ct);
+            var appliedJobIdSet = appliedJobIds.ToHashSet();
 
             // One taxonomy fetch + bounded-concurrency AI calls for all jobs at once,
             // instead of a fetch + a call sequentially per job.
@@ -206,7 +212,8 @@ namespace IRAS.Application.Modules.Matching
                     MatchScore = _scoring.ComputeTotalScore(skillMatch, semanticSimilarity, signals.MlFitScore),
                     SkillMatch = skillMatch,
                     SemanticSimilarity = semanticSimilarity,
-                    MlFitScore = signals.MlFitScore
+                    MlFitScore = signals.MlFitScore,
+                    HasApplied = appliedJobIdSet.Contains(job.JobId)
                 };
             });
 

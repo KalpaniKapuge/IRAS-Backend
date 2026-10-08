@@ -9,6 +9,7 @@ namespace IRAS.Application.Modules.Matching.DTOs
         public string? CompanyName { get; set; }
         public decimal MatchScore { get; set; }
         public bool ThresholdPassed { get; set; }
+        public bool HasApplied { get; set; }
         public DateTime MatchedAt { get; set; }
     }
 }
