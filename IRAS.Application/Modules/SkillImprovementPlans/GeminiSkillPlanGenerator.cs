@@ -83,20 +83,16 @@ namespace IRAS.Application.Modules.SkillImprovementPlans
         {
             var userPrompt = BuildUserPrompt(skillName, jobTitle, importance);
 
-            // thinking_level "minimal" — same reasoning as the other Gemini generators: this
-            // is a constrained, structured-output task, not deep reasoning, and the default
-            // thinking budget risks truncating the actual JSON answer. Roadmap JSON is larger
-            // than the other generators' outputs, so the token budget is raised accordingly.
             var requestBody = new GeminiRequest(
-                _options.Model,
-                SystemPrompt,
-                userPrompt,
-                new GeminiGenerationConfig(4096, "minimal"));
+                new GeminiContent(null, [new GeminiPart(SystemPrompt)]),
+                [new GeminiContent("user", [new GeminiPart(userPrompt)])],
+                new GeminiGenerationConfig(4096, "application/json"));
 
             GeminiResponse? result;
             try
             {
-                var httpResponse = await _http.PostAsJsonAsync("/v1beta/interactions", requestBody, JsonOpts, ct);
+                var endpoint = $"/v1beta/models/{Uri.EscapeDataString(_options.Model)}:generateContent";
+                var httpResponse = await _http.PostAsJsonAsync(endpoint, requestBody, JsonOpts, ct);
                 httpResponse.EnsureSuccessStatusCode();
                 result = await httpResponse.Content.ReadFromJsonAsync<GeminiResponse>(JsonOpts, ct);
             }
@@ -107,16 +103,15 @@ namespace IRAS.Application.Modules.SkillImprovementPlans
                     "The AI skill-plan service is temporarily unavailable. Please try again shortly.");
             }
 
-            var text = (result?.Steps ?? new List<GeminiStep>())
-                .SelectMany(s => s.Content ?? new List<GeminiContentPart>())
-                .Where(c => c.Type == "text" && !string.IsNullOrWhiteSpace(c.Text))
+            var text = (result?.Candidates ?? new List<GeminiCandidate>())
+                .SelectMany(c => c.Content?.Parts ?? new List<GeminiResponsePart>())
+                .Where(p => !string.IsNullOrWhiteSpace(p.Text))
                 .Select(c => c.Text)
                 .FirstOrDefault();
 
             if (string.IsNullOrWhiteSpace(text))
             {
-                _logger.LogError("Gemini skill plan generation returned no text content for skill '{SkillName}' (status={Status})",
-                    skillName, result?.Status ?? "null");
+                _logger.LogError("Gemini skill plan generation returned no text content for skill '{SkillName}'", skillName);
                 throw new InvalidOperationException("The AI service did not return a skill plan. Please try again.");
             }
 
@@ -186,19 +181,23 @@ namespace IRAS.Application.Modules.SkillImprovementPlans
 
         private record PlanStepPayload(string? Title, string? Description, string? Activity, string? Output);
 
-        // Mirrors Gemini's Interactions API JSON shape — same schema as the other generators.
+        // Mirrors Gemini's generateContent REST JSON shape:
+        // POST /v1beta/models/{model}:generateContent.
         private record GeminiRequest(
-            string Model,
-            [property: JsonPropertyName("system_instruction")] string SystemInstruction,
-            string Input,
-            [property: JsonPropertyName("generation_config")] GeminiGenerationConfig GenerationConfig);
+            [property: JsonPropertyName("systemInstruction")] GeminiContent SystemInstruction,
+            List<GeminiContent> Contents,
+            [property: JsonPropertyName("generationConfig")] GeminiGenerationConfig GenerationConfig);
+
+        private record GeminiContent(string? Role, List<GeminiPart> Parts);
+        private record GeminiPart(string Text);
 
         private record GeminiGenerationConfig(
-            [property: JsonPropertyName("max_output_tokens")] int MaxOutputTokens,
-            [property: JsonPropertyName("thinking_level")] string ThinkingLevel);
+            [property: JsonPropertyName("maxOutputTokens")] int MaxOutputTokens,
+            [property: JsonPropertyName("responseMimeType")] string ResponseMimeType);
 
-        private record GeminiResponse(string Status, List<GeminiStep>? Steps);
-        private record GeminiStep(List<GeminiContentPart>? Content);
-        private record GeminiContentPart(string Type, string? Text);
+        private record GeminiResponse(List<GeminiCandidate>? Candidates);
+        private record GeminiCandidate(GeminiResponseContent? Content);
+        private record GeminiResponseContent(List<GeminiResponsePart>? Parts);
+        private record GeminiResponsePart(string? Text);
     }
 }

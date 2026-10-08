@@ -91,15 +91,15 @@ namespace IRAS.Application.Modules.Assessments
             var userPrompt = BuildUserPrompt(job, skills, questionCount);
 
             var requestBody = new GeminiRequest(
-                _options.Model,
-                SystemPrompt,
-                userPrompt,
-                new GeminiGenerationConfig(4096, "minimal"));
+                new GeminiContent(null, [new GeminiPart(SystemPrompt)]),
+                [new GeminiContent("user", [new GeminiPart(userPrompt)])],
+                new GeminiGenerationConfig(4096, "application/json"));
 
             GeminiResponse? result;
             try
             {
-                var httpResponse = await _http.PostAsJsonAsync("/v1beta/interactions", requestBody, JsonOpts, ct);
+                var endpoint = $"/v1beta/models/{Uri.EscapeDataString(_options.Model)}:generateContent";
+                var httpResponse = await _http.PostAsJsonAsync(endpoint, requestBody, JsonOpts, ct);
                 httpResponse.EnsureSuccessStatusCode();
                 result = await httpResponse.Content.ReadFromJsonAsync<GeminiResponse>(JsonOpts, ct);
             }
@@ -110,16 +110,15 @@ namespace IRAS.Application.Modules.Assessments
                     "The AI assessment service is temporarily unavailable. Please try again shortly.");
             }
 
-            var text = (result?.Steps ?? new List<GeminiStep>())
-                .SelectMany(s => s.Content ?? new List<GeminiContentPart>())
-                .Where(c => c.Type == "text" && !string.IsNullOrWhiteSpace(c.Text))
+            var text = (result?.Candidates ?? new List<GeminiCandidate>())
+                .SelectMany(c => c.Content?.Parts ?? new List<GeminiResponsePart>())
+                .Where(p => !string.IsNullOrWhiteSpace(p.Text))
                 .Select(c => c.Text)
                 .FirstOrDefault();
 
             if (string.IsNullOrWhiteSpace(text))
             {
-                _logger.LogError("Gemini assessment question generation returned no text content for job {JobId} (status={Status})",
-                    job.JobId, result?.Status ?? "null");
+                _logger.LogError("Gemini assessment question generation returned no text content for job {JobId}", job.JobId);
                 throw new InvalidOperationException("The AI service did not return any assessment questions. Please try again.");
             }
 
@@ -211,17 +210,20 @@ namespace IRAS.Application.Modules.Assessments
             [property: JsonPropertyName("skillName")] string? SkillName);
 
         private record GeminiRequest(
-            string Model,
-            [property: JsonPropertyName("system_instruction")] string SystemInstruction,
-            string Input,
-            [property: JsonPropertyName("generation_config")] GeminiGenerationConfig GenerationConfig);
+            [property: JsonPropertyName("systemInstruction")] GeminiContent SystemInstruction,
+            List<GeminiContent> Contents,
+            [property: JsonPropertyName("generationConfig")] GeminiGenerationConfig GenerationConfig);
+
+        private record GeminiContent(string? Role, List<GeminiPart> Parts);
+        private record GeminiPart(string Text);
 
         private record GeminiGenerationConfig(
-            [property: JsonPropertyName("max_output_tokens")] int MaxOutputTokens,
-            [property: JsonPropertyName("thinking_level")] string ThinkingLevel);
+            [property: JsonPropertyName("maxOutputTokens")] int MaxOutputTokens,
+            [property: JsonPropertyName("responseMimeType")] string ResponseMimeType);
 
-        private record GeminiResponse(string Status, List<GeminiStep>? Steps);
-        private record GeminiStep(List<GeminiContentPart>? Content);
-        private record GeminiContentPart(string Type, string? Text);
+        private record GeminiResponse(List<GeminiCandidate>? Candidates);
+        private record GeminiCandidate(GeminiResponseContent? Content);
+        private record GeminiResponseContent(List<GeminiResponsePart>? Parts);
+        private record GeminiResponsePart(string? Text);
     }
 }

@@ -9,7 +9,7 @@ namespace IRAS.Application.Common.Options
         public const string SectionName = "Gemini";
 
         public string? ApiKey { get; set; }
-        public string Model { get; set; } = "gemini-3.6-flash";
+        public string Model { get; set; } = "gemini-2.5-flash";
         public string BaseUrl { get; set; } = "https://generativelanguage.googleapis.com";
     }
 }

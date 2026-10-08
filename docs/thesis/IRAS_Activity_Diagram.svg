@@ -1,0 +1,120 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="2400" height="1600" viewBox="0 0 2400 1600">
+  <rect width="2400" height="1600" fill="#F8FAFC"/>
+  <text x="1200" y="90" text-anchor="middle" font-size="42" font-family="Arial, sans-serif" font-weight="bold" fill="#0F172A">IRAS ACTIVITY DIAGRAM</text>
+  <text x="1200" y="136" text-anchor="middle" font-size="20" font-family="Arial, sans-serif" fill="#475569">Candidate, Employer, and Administrator Workflows with Shared System Services</text>
+  <rect x="70" y="170" width="700" height="1250" rx="24" fill="#E0F2FE" stroke="#0F172A" stroke-width="2"/>
+  <rect x="850" y="170" width="700" height="1250" rx="24" fill="#DCFCE7" stroke="#0F172A" stroke-width="2"/>
+  <rect x="1630" y="170" width="700" height="1250" rx="24" fill="#F3E8FF" stroke="#0F172A" stroke-width="2"/>
+  <rect x="100" y="1080" width="2200" height="250" rx="26" fill="#F1F5F9" stroke="#475569" stroke-width="2"/>
+
+  <text x="420" y="220" text-anchor="middle" font-size="30" font-family="Arial, sans-serif" font-weight="bold" fill="#0369A1">CANDIDATE</text>
+  <text x="1200" y="220" text-anchor="middle" font-size="30" font-family="Arial, sans-serif" font-weight="bold" fill="#15803D">EMPLOYER</text>
+  <text x="1980" y="220" text-anchor="middle" font-size="30" font-family="Arial, sans-serif" font-weight="bold" fill="#7C3AED">ADMINISTRATOR</text>
+
+  <rect x="110" y="270" width="610" height="110" rx="20" fill="#FFFFFF" stroke="#0369A1" stroke-width="3"/>
+  <text x="130" y="300" font-size="20" font-family="Arial, sans-serif" font-weight="bold" fill="#111827">1. Register / Login</text>
+  <text x="130" y="340" font-size="18" font-family="Arial, sans-serif" fill="#111827">Create account, sign in, and authenticate</text>
+
+  <rect x="110" y="420" width="610" height="110" rx="20" fill="#FFFFFF" stroke="#0369A1" stroke-width="3"/>
+  <text x="130" y="450" font-size="20" font-family="Arial, sans-serif" font-weight="bold" fill="#111827">2. Create Profile</text>
+  <text x="130" y="490" font-size="18" font-family="Arial, sans-serif" fill="#111827">Add personal details, skills, education and experience</text>
+
+  <rect x="110" y="570" width="610" height="120" rx="20" fill="#FFFFFF" stroke="#0369A1" stroke-width="3"/>
+  <text x="130" y="600" font-size="20" font-family="Arial, sans-serif" font-weight="bold" fill="#111827">3. Upload Resume</text>
+  <text x="130" y="640" font-size="18" font-family="Arial, sans-serif" fill="#111827">Parse CV and store structured profile data</text>
+
+  <rect x="110" y="730" width="610" height="120" rx="20" fill="#FFFFFF" stroke="#0369A1" stroke-width="3"/>
+  <text x="130" y="760" font-size="20" font-family="Arial, sans-serif" font-weight="bold" fill="#111827">4. Search and Apply</text>
+  <text x="130" y="800" font-size="18" font-family="Arial, sans-serif" fill="#111827">View job matches, submit application, and track status</text>
+
+  <rect x="110" y="900" width="610" height="120" rx="20" fill="#FFFFFF" stroke="#0369A1" stroke-width="3"/>
+  <text x="130" y="930" font-size="20" font-family="Arial, sans-serif" font-weight="bold" fill="#111827">5. Review Match and Skill Gap</text>
+  <text x="130" y="970" font-size="18" font-family="Arial, sans-serif" fill="#111827">Check fit score, missing skills, and recommended plan</text>
+
+  <rect x="110" y="1070" width="610" height="120" rx="20" fill="#FFFFFF" stroke="#0369A1" stroke-width="3"/>
+  <text x="130" y="1100" font-size="20" font-family="Arial, sans-serif" font-weight="bold" fill="#111827">6. Generate CV / Complete Assessment</text>
+  <text x="130" y="1140" font-size="18" font-family="Arial, sans-serif" fill="#111827">Improve profile, complete assessment, and receive feedback</text>
+
+  <rect x="890" y="270" width="610" height="110" rx="20" fill="#FFFFFF" stroke="#15803D" stroke-width="3"/>
+  <text x="910" y="300" font-size="20" font-family="Arial, sans-serif" font-weight="bold" fill="#111827">1. Register / Login</text>
+  <text x="910" y="340" font-size="18" font-family="Arial, sans-serif" fill="#111827">Create employer account and authenticate</text>
+
+  <rect x="890" y="420" width="610" height="110" rx="20" fill="#FFFFFF" stroke="#15803D" stroke-width="3"/>
+  <text x="910" y="450" font-size="20" font-family="Arial, sans-serif" font-weight="bold" fill="#111827">2. Company Profile</text>
+  <text x="910" y="490" font-size="18" font-family="Arial, sans-serif" fill="#111827">Set up organisation details and hiring preferences</text>
+
+  <rect x="890" y="570" width="610" height="120" rx="20" fill="#FFFFFF" stroke="#15803D" stroke-width="3"/>
+  <text x="910" y="600" font-size="20" font-family="Arial, sans-serif" font-weight="bold" fill="#111827">3. Create Job / AI JD Draft</text>
+  <text x="910" y="640" font-size="18" font-family="Arial, sans-serif" fill="#111827">Define role requirements and generate job description</text>
+
+  <rect x="890" y="730" width="610" height="120" rx="20" fill="#FFFFFF" stroke="#15803D" stroke-width="3"/>
+  <text x="910" y="760" font-size="20" font-family="Arial, sans-serif" font-weight="bold" fill="#111827">4. Review Applicants</text>
+  <text x="910" y="800" font-size="18" font-family="Arial, sans-serif" fill="#111827">View ranked candidates and match evidence</text>
+
+  <rect x="890" y="900" width="610" height="120" rx="20" fill="#FFFFFF" stroke="#15803D" stroke-width="3"/>
+  <text x="910" y="930" font-size="20" font-family="Arial, sans-serif" font-weight="bold" fill="#111827">5. Shortlist and Schedule</text>
+  <text x="910" y="970" font-size="18" font-family="Arial, sans-serif" fill="#111827">Approve shortlist, configure assessment, and schedule interview</text>
+
+  <rect x="890" y="1070" width="610" height="120" rx="20" fill="#FFFFFF" stroke="#15803D" stroke-width="3"/>
+  <text x="910" y="1100" font-size="20" font-family="Arial, sans-serif" font-weight="bold" fill="#111827">6. Final Review and Feedback</text>
+  <text x="910" y="1140" font-size="18" font-family="Arial, sans-serif" fill="#111827">Send interview result, feedback, and hiring decision support</text>
+
+  <rect x="1670" y="270" width="610" height="110" rx="20" fill="#FFFFFF" stroke="#7C3AED" stroke-width="3"/>
+  <text x="1690" y="300" font-size="20" font-family="Arial, sans-serif" font-weight="bold" fill="#111827">1. Login and Access Control</text>
+  <text x="1690" y="340" font-size="18" font-family="Arial, sans-serif" fill="#111827">Verify role and secure system access</text>
+
+  <rect x="1670" y="420" width="610" height="110" rx="20" fill="#FFFFFF" stroke="#7C3AED" stroke-width="3"/>
+  <text x="1690" y="450" font-size="20" font-family="Arial, sans-serif" font-weight="bold" fill="#111827">2. Manage Users and Jobs</text>
+  <text x="1690" y="490" font-size="18" font-family="Arial, sans-serif" fill="#111827">Moderate candidates, employers, and vacancies</text>
+
+  <rect x="1670" y="570" width="610" height="120" rx="20" fill="#FFFFFF" stroke="#7C3AED" stroke-width="3"/>
+  <text x="1690" y="600" font-size="20" font-family="Arial, sans-serif" font-weight="bold" fill="#111827">3. Maintain Knowledge Base</text>
+  <text x="1690" y="640" font-size="18" font-family="Arial, sans-serif" fill="#111827">Update skill taxonomy, resources, and domain knowledge</text>
+
+  <rect x="1670" y="730" width="610" height="120" rx="20" fill="#FFFFFF" stroke="#7C3AED" stroke-width="3"/>
+  <text x="1690" y="760" font-size="20" font-family="Arial, sans-serif" font-weight="bold" fill="#111827">4. Review Evidence and Audit Logs</text>
+  <text x="1690" y="800" font-size="18" font-family="Arial, sans-serif" fill="#111827">Inspect match results, logs, and AI-service actions</text>
+
+  <rect x="1670" y="900" width="610" height="120" rx="20" fill="#FFFFFF" stroke="#7C3AED" stroke-width="3"/>
+  <text x="1690" y="930" font-size="20" font-family="Arial, sans-serif" font-weight="bold" fill="#111827">5. Monitor AI and System Health</text>
+  <text x="1690" y="970" font-size="18" font-family="Arial, sans-serif" fill="#111827">Check model, storage, and service availability</text>
+
+  <rect x="1670" y="1070" width="610" height="120" rx="20" fill="#FFFFFF" stroke="#7C3AED" stroke-width="3"/>
+  <text x="1690" y="1100" font-size="20" font-family="Arial, sans-serif" font-weight="bold" fill="#111827">6. Generate Reports</text>
+  <text x="1690" y="1140" font-size="18" font-family="Arial, sans-serif" fill="#111827">Review activity, status, and operational oversight</text>
+
+  <text x="1200" y="1200" text-anchor="middle" font-size="28" font-family="Arial, sans-serif" font-weight="bold" fill="#334155">COMMON SYSTEM SERVICES</text>
+  <text x="1200" y="1255" text-anchor="middle" font-size="22" font-family="Arial, sans-serif" fill="#475569">Authentication • SQL Database • File Storage • AI / Gemini Service • Semantic Matching • Candidate Fit Model</text>
+
+  <line x1="720" y1="325" x2="890" y2="325" stroke="#475569" stroke-width="3"/>
+  <line x1="720" y1="475" x2="890" y2="475" stroke="#475569" stroke-width="3"/>
+  <line x1="720" y1="630" x2="890" y2="630" stroke="#475569" stroke-width="3"/>
+  <line x1="720" y1="790" x2="890" y2="790" stroke="#475569" stroke-width="3"/>
+  <line x1="720" y1="960" x2="890" y2="960" stroke="#475569" stroke-width="3"/>
+  <line x1="720" y1="1130" x2="890" y2="1130" stroke="#475569" stroke-width="3"/>
+
+  <line x1="1500" y1="325" x2="1670" y2="325" stroke="#475569" stroke-width="3"/>
+  <line x1="1500" y1="475" x2="1670" y2="475" stroke="#475569" stroke-width="3"/>
+  <line x1="1500" y1="630" x2="1670" y2="630" stroke="#475569" stroke-width="3"/>
+  <line x1="1500" y1="790" x2="1670" y2="790" stroke="#475569" stroke-width="3"/>
+  <line x1="1500" y1="960" x2="1670" y2="960" stroke="#475569" stroke-width="3"/>
+  <line x1="1500" y1="1130" x2="1670" y2="1130" stroke="#475569" stroke-width="3"/>
+
+  <path d="M 350 380 L 350 420" stroke="#475569" stroke-width="3" fill="none"/>
+  <path d="M 350 530 L 350 570" stroke="#475569" stroke-width="3" fill="none"/>
+  <path d="M 350 690 L 350 730" stroke="#475569" stroke-width="3" fill="none"/>
+  <path d="M 350 850 L 350 900" stroke="#475569" stroke-width="3" fill="none"/>
+  <path d="M 350 1020 L 350 1070" stroke="#475569" stroke-width="3" fill="none"/>
+
+  <path d="M 1200 380 L 1200 420" stroke="#475569" stroke-width="3" fill="none"/>
+  <path d="M 1200 530 L 1200 570" stroke="#475569" stroke-width="3" fill="none"/>
+  <path d="M 1200 690 L 1200 730" stroke="#475569" stroke-width="3" fill="none"/>
+  <path d="M 1200 850 L 1200 900" stroke="#475569" stroke-width="3" fill="none"/>
+  <path d="M 1200 1020 L 1200 1070" stroke="#475569" stroke-width="3" fill="none"/>
+
+  <path d="M 1980 380 L 1980 420" stroke="#475569" stroke-width="3" fill="none"/>
+  <path d="M 1980 530 L 1980 570" stroke="#475569" stroke-width="3" fill="none"/>
+  <path d="M 1980 690 L 1980 730" stroke="#475569" stroke-width="3" fill="none"/>
+  <path d="M 1980 850 L 1980 900" stroke="#475569" stroke-width="3" fill="none"/>
+  <path d="M 1980 1020 L 1980 1070" stroke="#475569" stroke-width="3" fill="none"/>
+</svg>

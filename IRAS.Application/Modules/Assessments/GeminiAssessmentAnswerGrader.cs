@@ -61,26 +61,26 @@ namespace IRAS.Application.Modules.Assessments
             var userPrompt = BuildUserPrompt(questionText, modelAnswer, candidateAnswer);
 
             var requestBody = new GeminiRequest(
-                _options.Model,
-                SystemPrompt,
-                userPrompt,
-                new GeminiGenerationConfig(512, "minimal"));
+                new GeminiContent(null, [new GeminiPart(SystemPrompt)]),
+                [new GeminiContent("user", [new GeminiPart(userPrompt)])],
+                new GeminiGenerationConfig(512, "application/json"));
 
             try
             {
-                var httpResponse = await _http.PostAsJsonAsync("/v1beta/interactions", requestBody, JsonOpts, ct);
+                var endpoint = $"/v1beta/models/{Uri.EscapeDataString(_options.Model)}:generateContent";
+                var httpResponse = await _http.PostAsJsonAsync(endpoint, requestBody, JsonOpts, ct);
                 httpResponse.EnsureSuccessStatusCode();
                 var result = await httpResponse.Content.ReadFromJsonAsync<GeminiResponse>(JsonOpts, ct);
 
-                var text = (result?.Steps ?? new List<GeminiStep>())
-                    .SelectMany(s => s.Content ?? new List<GeminiContentPart>())
-                    .Where(c => c.Type == "text" && !string.IsNullOrWhiteSpace(c.Text))
-                    .Select(c => c.Text)
+                var text = (result?.Candidates ?? new List<GeminiCandidate>())
+                    .SelectMany(c => c.Content?.Parts ?? new List<GeminiResponsePart>())
+                    .Where(p => !string.IsNullOrWhiteSpace(p.Text))
+                    .Select(p => p.Text)
                     .FirstOrDefault();
 
                 if (string.IsNullOrWhiteSpace(text))
                 {
-                    _logger.LogWarning("Gemini answer grading returned no text content (status={Status})", result?.Status ?? "null");
+                    _logger.LogWarning("Gemini answer grading returned no text content");
                     return 0m;
                 }
 
@@ -137,17 +137,20 @@ namespace IRAS.Application.Modules.Assessments
         private record ScorePayload([property: JsonPropertyName("score")] int Score, [property: JsonPropertyName("rationale")] string? Rationale);
 
         private record GeminiRequest(
-            string Model,
-            [property: JsonPropertyName("system_instruction")] string SystemInstruction,
-            string Input,
-            [property: JsonPropertyName("generation_config")] GeminiGenerationConfig GenerationConfig);
+            [property: JsonPropertyName("systemInstruction")] GeminiContent SystemInstruction,
+            List<GeminiContent> Contents,
+            [property: JsonPropertyName("generationConfig")] GeminiGenerationConfig GenerationConfig);
+
+        private record GeminiContent(string? Role, List<GeminiPart> Parts);
+        private record GeminiPart(string Text);
 
         private record GeminiGenerationConfig(
-            [property: JsonPropertyName("max_output_tokens")] int MaxOutputTokens,
-            [property: JsonPropertyName("thinking_level")] string ThinkingLevel);
+            [property: JsonPropertyName("maxOutputTokens")] int MaxOutputTokens,
+            [property: JsonPropertyName("responseMimeType")] string ResponseMimeType);
 
-        private record GeminiResponse(string Status, List<GeminiStep>? Steps);
-        private record GeminiStep(List<GeminiContentPart>? Content);
-        private record GeminiContentPart(string Type, string? Text);
+        private record GeminiResponse(List<GeminiCandidate>? Candidates);
+        private record GeminiCandidate(GeminiResponseContent? Content);
+        private record GeminiResponseContent(List<GeminiResponsePart>? Parts);
+        private record GeminiResponsePart(string? Text);
     }
 }
