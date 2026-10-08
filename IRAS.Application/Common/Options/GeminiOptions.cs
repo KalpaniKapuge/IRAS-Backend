@@ -7,9 +7,26 @@ namespace IRAS.Application.Common.Options
     public class GeminiOptions
     {
         public const string SectionName = "Gemini";
+        private const string DefaultModel = "gemini-2.5-flash";
+        private string _model = DefaultModel;
 
         public string? ApiKey { get; set; }
-        public string Model { get; set; } = "gemini-2.5-flash";
+        public string Model
+        {
+            get => NormalizeModelName(_model);
+            set => _model = value;
+        }
         public string BaseUrl { get; set; } = "https://generativelanguage.googleapis.com";
+
+        private static string NormalizeModelName(string? model)
+        {
+            if (string.IsNullOrWhiteSpace(model)) return DefaultModel;
+
+            var trimmed = model.Trim();
+            return trimmed.Equals("gemini-3.6-flash", StringComparison.OrdinalIgnoreCase) ||
+                   trimmed.Equals("gemini-3.5-flash", StringComparison.OrdinalIgnoreCase)
+                ? DefaultModel
+                : trimmed;
+        }
     }
 }

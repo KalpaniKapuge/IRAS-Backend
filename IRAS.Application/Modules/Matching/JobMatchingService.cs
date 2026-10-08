@@ -106,6 +106,42 @@ namespace IRAS.Application.Modules.Matching
 
         public async Task<List<JobMatchDto>> GetMyMatchesAsync(int candidateId, CancellationToken ct)
         {
+            var liveMatches = (await GetRecommendedJobsAsync(candidateId, ct))
+                .Where(r => r.MatchScore >= _options.AutoMatchThreshold)
+                .ToList();
+
+            if (liveMatches.Count > 0)
+            {
+                var liveJobIds = liveMatches.Select(r => r.JobId).ToList();
+                var existingMatches = await _db.JobMatches
+                    .Where(m => m.CandidateId == candidateId && liveJobIds.Contains(m.JobId))
+                    .ToListAsync(ct);
+                var existingByJobId = existingMatches.ToDictionary(m => m.JobId);
+
+                foreach (var liveMatch in liveMatches)
+                {
+                    if (existingByJobId.TryGetValue(liveMatch.JobId, out var existing))
+                    {
+                        existing.MatchScore = liveMatch.MatchScore;
+                        existing.ThresholdPassed = true;
+                        existing.IsNotified = true;
+                    }
+                    else
+                    {
+                        _db.JobMatches.Add(new JobMatch
+                        {
+                            JobId = liveMatch.JobId,
+                            CandidateId = candidateId,
+                            MatchScore = liveMatch.MatchScore,
+                            ThresholdPassed = true,
+                            IsNotified = true
+                        });
+                    }
+                }
+
+                await _db.SaveChangesAsync(ct);
+            }
+
             return await _db.JobMatches
                 .Where(m => m.CandidateId == candidateId && m.ThresholdPassed)
                 .OrderByDescending(m => m.MatchScore)
