@@ -74,6 +74,14 @@ namespace IRAS.Application.Modules.Assessments
 
             if (existing is not null)
             {
+                if (existing.JobAssessment.Questions.Count == 0)
+                {
+                    var repaired = await RepairAssessmentQuestionsAsync(job, existing.JobAssessment, ct);
+                    existing.JobAssessment = repaired;
+                    existing.JobAssessmentId = repaired.JobAssessmentId;
+                    await _db.SaveChangesAsync(ct);
+                }
+
                 return new StartAssessmentResponse
                 {
                     AttemptId = existing.AttemptId,
@@ -247,6 +255,58 @@ namespace IRAS.Application.Modules.Assessments
 
         private static DateTime ComputeDeadline(CandidateAssessmentAttempt attempt) =>
             attempt.StartedAt.AddSeconds(attempt.JobAssessment.Questions.Count * SecondsPerQuestion);
+
+        private async Task<JobAssessment> RepairAssessmentQuestionsAsync(Job job, JobAssessment assessment, CancellationToken ct)
+        {
+            var skills = job.RequiredSkills
+                .Select(rs => (rs.Skill.SkillName, Importance: rs.Importance.ToString(), rs.Skill.Category))
+                .ToList();
+
+            List<GeneratedQuestion> generated;
+            IAssessmentQuestionGenerator usedGenerator;
+            try
+            {
+                generated = await _generator.GenerateAsync(job, skills, QuestionCount, ct);
+                if (generated.Count == 0)
+                    throw new InvalidOperationException("The AI service returned no questions.");
+                usedGenerator = _generator;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "AI assessment question repair unavailable for job {JobId}; falling back to template", job.JobId);
+                generated = await _fallbackGenerator.GenerateAsync(job, skills, QuestionCount, ct);
+                usedGenerator = _fallbackGenerator;
+            }
+
+            if (generated.Count < QuestionCount)
+            {
+                var fallback = await _fallbackGenerator.GenerateAsync(job, skills, QuestionCount, ct);
+                generated = generated
+                    .Concat(fallback)
+                    .Where(q => !string.IsNullOrWhiteSpace(q.QuestionText))
+                    .DistinctBy(q => q.QuestionText.Trim().ToUpperInvariant())
+                    .Take(QuestionCount)
+                    .ToList();
+            }
+
+            if (generated.Count == 0)
+                throw new InvalidOperationException("Unable to generate a skill assessment for this job. Please try again shortly.");
+
+            var skillIdByName = job.RequiredSkills.ToDictionary(rs => rs.Skill.SkillName, rs => rs.SkillId, StringComparer.OrdinalIgnoreCase);
+            assessment.GeneratedBy = usedGenerator.Name;
+            assessment.GeneratedAt = DateTime.UtcNow;
+            assessment.Questions = generated.Select((q, i) => new AssessmentQuestion
+            {
+                QuestionType = q.QuestionType,
+                QuestionText = q.QuestionText,
+                Options = q.Options,
+                CorrectOptionIndex = q.CorrectOptionIndex,
+                ModelAnswer = q.ModelAnswer,
+                QuestionOrder = i,
+                SkillId = q.SkillName is not null && skillIdByName.TryGetValue(q.SkillName, out var skillId) ? skillId : null,
+            }).ToList();
+            return assessment;
+        }
 
         private async Task<JobAssessment> GetOrCreateAssessmentAsync(Job job, CancellationToken ct)
         {
