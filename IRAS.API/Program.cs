@@ -247,6 +247,7 @@ builder.Services.AddHttpClient<ISkillPlanGenerator, GeminiSkillPlanGenerator>((s
     client.BaseAddress = new Uri(opts.BaseUrl);
     client.Timeout = TimeSpan.FromSeconds(60);
 });
+builder.Services.AddScoped<TemplateSkillPlanGenerator>();
 
 builder.Services.AddHttpClient<IFeedbackGenerator, GeminiFeedbackGenerator>((sp, client) =>
 {

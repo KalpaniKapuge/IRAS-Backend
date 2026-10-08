@@ -1,5 +1,6 @@
 // IRAS.Application/Modules/SkillImprovementPlans/SkillImprovementPlanService.cs
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using IRAS.Application.Modules.SkillImprovementPlans.DTOs;
 using IRAS.Domain.Entities.Skills;
 using IRAS.Domain.Enums;
@@ -11,11 +12,19 @@ namespace IRAS.Application.Modules.SkillImprovementPlans
     {
         private readonly IrasDbContext _db;
         private readonly ISkillPlanGenerator _generator;
+        private readonly TemplateSkillPlanGenerator _fallbackGenerator;
+        private readonly ILogger<SkillImprovementPlanService> _logger;
 
-        public SkillImprovementPlanService(IrasDbContext db, ISkillPlanGenerator generator)
+        public SkillImprovementPlanService(
+            IrasDbContext db,
+            ISkillPlanGenerator generator,
+            TemplateSkillPlanGenerator fallbackGenerator,
+            ILogger<SkillImprovementPlanService> logger)
         {
             _db = db;
             _generator = generator;
+            _fallbackGenerator = fallbackGenerator;
+            _logger = logger;
         }
 
         public async Task<List<SkillImprovementPlanDto>> GetMyPlansAsync(int candidateId, CancellationToken ct)
@@ -64,8 +73,21 @@ namespace IRAS.Application.Modules.SkillImprovementPlans
             if (gap is null)
                 throw new ArgumentException("No detected skill gap found for this candidate and skill.");
 
-            var generated = await _generator.GenerateAsync(
-                skill.SkillName, gap.Application.Job.Title, gap.Importance.ToString(), ct);
+            SkillPlanGenerationResult generated;
+            ISkillPlanGenerator usedGenerator;
+            try
+            {
+                generated = await _generator.GenerateAsync(
+                    skill.SkillName, gap.Application.Job.Title, gap.Importance.ToString(), ct);
+                usedGenerator = _generator;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "AI skill plan generation unavailable for candidate {CandidateId}, skill {SkillId}; using template fallback", candidateId, skillId);
+                generated = await _fallbackGenerator.GenerateAsync(
+                    skill.SkillName, gap.Application.Job.Title, gap.Importance.ToString(), ct);
+                usedGenerator = _fallbackGenerator;
+            }
 
             // A plan is how a candidate starts actively tracking a skill — ensure the
             // underlying target-skill bookkeeping exists rather than duplicating it.
@@ -88,7 +110,7 @@ namespace IRAS.Application.Modules.SkillImprovementPlans
                 ProjectTask = generated.ProjectTask,
                 ProjectExpectedOutput = generated.ProjectExpectedOutput,
                 Status = SkillPlanStatus.NotStarted,
-                GeneratedBy = _generator.Name,
+                GeneratedBy = usedGenerator.Name,
                 Steps = generated.Steps.Select((s, i) => new SkillPlanStep
                 {
                     StepOrder = i + 1,

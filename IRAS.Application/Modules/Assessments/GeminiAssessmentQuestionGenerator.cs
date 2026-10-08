@@ -62,7 +62,10 @@ namespace IRAS.Application.Modules.Assessments
                empty/0) and always include "modelAnswer".
             """;
 
-        private static readonly JsonSerializerOptions JsonOpts = new(JsonSerializerDefaults.Web);
+        private static readonly JsonSerializerOptions JsonOpts = new(JsonSerializerDefaults.Web)
+        {
+            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
+        };
 
         private readonly HttpClient _http;
         private readonly GeminiOptions _options;
@@ -100,7 +103,13 @@ namespace IRAS.Application.Modules.Assessments
             {
                 var endpoint = $"/v1beta/models/{Uri.EscapeDataString(_options.Model)}:generateContent";
                 var httpResponse = await _http.PostAsJsonAsync(endpoint, requestBody, JsonOpts, ct);
-                httpResponse.EnsureSuccessStatusCode();
+                if (!httpResponse.IsSuccessStatusCode)
+                {
+                    var errorBody = await httpResponse.Content.ReadAsStringAsync(ct);
+                    _logger.LogError("Gemini assessment question generation failed for job {JobId}. Status={StatusCode}, Body={Body}",
+                        job.JobId, (int)httpResponse.StatusCode, errorBody);
+                    throw new InvalidOperationException($"Gemini returned HTTP {(int)httpResponse.StatusCode}: {errorBody}");
+                }
                 result = await httpResponse.Content.ReadFromJsonAsync<GeminiResponse>(JsonOpts, ct);
             }
             catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or JsonException)
@@ -210,16 +219,16 @@ namespace IRAS.Application.Modules.Assessments
             [property: JsonPropertyName("skillName")] string? SkillName);
 
         private record GeminiRequest(
-            [property: JsonPropertyName("systemInstruction")] GeminiContent SystemInstruction,
+            [property: JsonPropertyName("system_instruction")] GeminiContent SystemInstruction,
             List<GeminiContent> Contents,
-            [property: JsonPropertyName("generationConfig")] GeminiGenerationConfig GenerationConfig);
+            [property: JsonPropertyName("generation_config")] GeminiGenerationConfig GenerationConfig);
 
         private record GeminiContent(string? Role, List<GeminiPart> Parts);
         private record GeminiPart(string Text);
 
         private record GeminiGenerationConfig(
-            [property: JsonPropertyName("maxOutputTokens")] int MaxOutputTokens,
-            [property: JsonPropertyName("responseMimeType")] string ResponseMimeType);
+            [property: JsonPropertyName("max_output_tokens")] int MaxOutputTokens,
+            [property: JsonPropertyName("response_mime_type")] string ResponseMimeType);
 
         private record GeminiResponse(List<GeminiCandidate>? Candidates);
         private record GeminiCandidate(GeminiResponseContent? Content);
