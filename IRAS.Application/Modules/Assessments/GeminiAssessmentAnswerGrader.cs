@@ -146,16 +146,16 @@ namespace IRAS.Application.Modules.Assessments
         private record ScorePayload([property: JsonPropertyName("score")] int Score, [property: JsonPropertyName("rationale")] string? Rationale);
 
         private record GeminiRequest(
-            [property: JsonPropertyName("system_instruction")] GeminiContent SystemInstruction,
+            [property: JsonPropertyName("systemInstruction")] GeminiContent SystemInstruction,
             List<GeminiContent> Contents,
-            [property: JsonPropertyName("generation_config")] GeminiGenerationConfig GenerationConfig);
+            [property: JsonPropertyName("generationConfig")] GeminiGenerationConfig GenerationConfig);
 
         private record GeminiContent(string? Role, List<GeminiPart> Parts);
         private record GeminiPart(string Text);
 
         private record GeminiGenerationConfig(
-            [property: JsonPropertyName("max_output_tokens")] int MaxOutputTokens,
-            [property: JsonPropertyName("response_mime_type")] string ResponseMimeType);
+            [property: JsonPropertyName("maxOutputTokens")] int MaxOutputTokens,
+            [property: JsonPropertyName("responseMimeType")] string ResponseMimeType);
 
         private record GeminiResponse(List<GeminiCandidate>? Candidates);
         private record GeminiCandidate(GeminiResponseContent? Content);

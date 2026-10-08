@@ -234,21 +234,29 @@ else
 
 builder.Services.AddScoped<IAssessmentService, AssessmentService>();
 
-builder.Services.AddHttpClient<ISkillGapExplainer, GeminiSkillGapExplainer>((sp, client) =>
+if (geminiConfigured)
 {
-    var opts = builder.Configuration.GetSection(GeminiOptions.SectionName).Get<GeminiOptions>()
-        ?? new GeminiOptions();
-    client.BaseAddress = new Uri(opts.BaseUrl);
-    client.Timeout = TimeSpan.FromSeconds(60);
-});
+    builder.Services.AddHttpClient<ISkillGapExplainer, GeminiSkillGapExplainer>((sp, client) =>
+    {
+        var opts = builder.Configuration.GetSection(GeminiOptions.SectionName).Get<GeminiOptions>()
+            ?? new GeminiOptions();
+        client.BaseAddress = new Uri(opts.BaseUrl);
+        client.Timeout = TimeSpan.FromSeconds(60);
+    });
 
-builder.Services.AddHttpClient<ISkillPlanGenerator, GeminiSkillPlanGenerator>((sp, client) =>
+    builder.Services.AddHttpClient<ISkillPlanGenerator, GeminiSkillPlanGenerator>((sp, client) =>
+    {
+        var opts = builder.Configuration.GetSection(GeminiOptions.SectionName).Get<GeminiOptions>()
+            ?? new GeminiOptions();
+        client.BaseAddress = new Uri(opts.BaseUrl);
+        client.Timeout = TimeSpan.FromSeconds(60);
+    });
+}
+else
 {
-    var opts = builder.Configuration.GetSection(GeminiOptions.SectionName).Get<GeminiOptions>()
-        ?? new GeminiOptions();
-    client.BaseAddress = new Uri(opts.BaseUrl);
-    client.Timeout = TimeSpan.FromSeconds(60);
-});
+    builder.Services.AddScoped<ISkillGapExplainer, TemplateSkillGapExplainer>();
+    builder.Services.AddScoped<ISkillPlanGenerator, TemplateSkillPlanGenerator>();
+}
 builder.Services.AddScoped<TemplateSkillPlanGenerator>();
 
 builder.Services.AddHttpClient<IFeedbackGenerator, GeminiFeedbackGenerator>((sp, client) =>

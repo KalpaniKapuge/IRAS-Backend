@@ -56,7 +56,10 @@ namespace IRAS.Application.Modules.Jobs
                explanation, no commentary before or after it.
             """;
 
-        private static readonly JsonSerializerOptions JsonOpts = new(JsonSerializerDefaults.Web);
+        private static readonly JsonSerializerOptions JsonOpts = new(JsonSerializerDefaults.Web)
+        {
+            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
+        };
 
         private readonly HttpClient _http;
         private readonly GeminiOptions _options;
@@ -95,23 +98,29 @@ namespace IRAS.Application.Modules.Jobs
 
             var userPrompt = BuildUserPrompt(job, skills, companyName, companyDescription, additionalNotes);
 
-            // thinking_level "minimal": JD generation is a rewriting/structuring task, not
+            // JD generation is a rewriting/structuring task, so keep generation settings simple.
             // deep multi-step reasoning. Left at the default, the model's internal
-            // "thinking" competes with the actual output for the same max_output_tokens
+            // Extra model reasoning can compete with the actual output for the same token
             // budget — observed empirically to consume 90%+ of a small budget and leave
             // the real answer truncated (status "incomplete"). Minimal thinking leaves the
             // budget for the JD text itself.
             var requestBody = new GeminiRequest(
-                _options.Model,
-                SystemPrompt,
-                userPrompt,
-                new GeminiGenerationConfig(4096, "minimal"));
+                new GeminiContent(null, [new GeminiPart(SystemPrompt)]),
+                [new GeminiContent("user", [new GeminiPart(userPrompt)])],
+                new GeminiGenerationConfig(4096, "text/plain"));
 
             GeminiResponse? result;
             try
             {
-                var httpResponse = await _http.PostAsJsonAsync("/v1beta/interactions", requestBody, JsonOpts);
-                httpResponse.EnsureSuccessStatusCode();
+                var endpoint = $"/v1beta/models/{Uri.EscapeDataString(_options.Model)}:generateContent";
+                var httpResponse = await _http.PostAsJsonAsync(endpoint, requestBody, JsonOpts);
+                if (!httpResponse.IsSuccessStatusCode)
+                {
+                    var errorBody = await httpResponse.Content.ReadAsStringAsync();
+                    _logger.LogError("Gemini JD generation failed for job {JobId}. Status={StatusCode}, Body={Body}",
+                        job.JobId, (int)httpResponse.StatusCode, errorBody);
+                    throw new InvalidOperationException($"Gemini returned HTTP {(int)httpResponse.StatusCode}: {errorBody}");
+                }
                 result = await httpResponse.Content.ReadFromJsonAsync<GeminiResponse>(JsonOpts);
             }
             catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or JsonException)
@@ -124,21 +133,17 @@ namespace IRAS.Application.Modules.Jobs
             // "incomplete" still carries whatever text the model produced before hitting
             // the token cap — worth returning rather than discarding. Only a genuinely
             // empty result (or an outright failed/cancelled status) is a hard failure.
-            var text = (result?.Steps ?? new List<GeminiStep>())
-                .SelectMany(s => s.Content ?? new List<GeminiContentPart>())
-                .Where(c => c.Type == "text" && !string.IsNullOrWhiteSpace(c.Text))
-                .Select(c => c.Text)
+            var text = (result?.Candidates ?? new List<GeminiCandidate>())
+                .SelectMany(c => c.Content?.Parts ?? new List<GeminiResponsePart>())
+                .Where(p => !string.IsNullOrWhiteSpace(p.Text))
+                .Select(p => p.Text)
                 .FirstOrDefault();
 
             if (string.IsNullOrWhiteSpace(text))
             {
-                _logger.LogError("Gemini JD generation returned no text content for job {JobId} (status={Status})",
-                    job.JobId, result?.Status ?? "null");
+                _logger.LogError("Gemini JD generation returned no text content for job {JobId}", job.JobId);
                 throw new InvalidOperationException("The AI service did not return a job description. Please try again.");
             }
-
-            if (result!.Status == "incomplete")
-                _logger.LogWarning("Gemini JD generation for job {JobId} was truncated (status=incomplete); returning partial text", job.JobId);
 
             return text.Trim();
         }
@@ -181,20 +186,23 @@ namespace IRAS.Application.Modules.Jobs
             return sb.ToString();
         }
 
-        // Mirrors Gemini's Interactions API JSON shape (POST /v1beta/interactions).
-        // Field names are explicitly snake_case per Google's documented schema.
+        // Mirrors Gemini's generateContent REST JSON shape:
+        // POST /v1beta/models/{model}:generateContent.
         private record GeminiRequest(
-            string Model,
-            [property: JsonPropertyName("system_instruction")] string SystemInstruction,
-            string Input,
-            [property: JsonPropertyName("generation_config")] GeminiGenerationConfig GenerationConfig);
+            [property: JsonPropertyName("systemInstruction")] GeminiContent SystemInstruction,
+            List<GeminiContent> Contents,
+            [property: JsonPropertyName("generationConfig")] GeminiGenerationConfig GenerationConfig);
+
+        private record GeminiContent(string? Role, List<GeminiPart> Parts);
+        private record GeminiPart(string Text);
 
         private record GeminiGenerationConfig(
-            [property: JsonPropertyName("max_output_tokens")] int MaxOutputTokens,
-            [property: JsonPropertyName("thinking_level")] string ThinkingLevel);
+            [property: JsonPropertyName("maxOutputTokens")] int MaxOutputTokens,
+            [property: JsonPropertyName("responseMimeType")] string ResponseMimeType);
 
-        private record GeminiResponse(string Status, List<GeminiStep>? Steps);
-        private record GeminiStep(List<GeminiContentPart>? Content);
-        private record GeminiContentPart(string Type, string? Text);
+        private record GeminiResponse(List<GeminiCandidate>? Candidates);
+        private record GeminiCandidate(GeminiResponseContent? Content);
+        private record GeminiResponseContent(List<GeminiResponsePart>? Parts);
+        private record GeminiResponsePart(string? Text);
     }
 }

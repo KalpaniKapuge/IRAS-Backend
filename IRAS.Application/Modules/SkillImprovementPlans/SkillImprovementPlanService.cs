@@ -214,7 +214,7 @@ namespace IRAS.Application.Modules.SkillImprovementPlans
                 ProjectTask = p.ProjectTask,
                 ProjectExpectedOutput = p.ProjectExpectedOutput,
                 Status = status.ToString(),
-                GeneratedBy = "Gemini",
+                GeneratedBy = p.GeneratedBy,
                 CreatedAt = p.CreatedAt,
                 ProgressPercent = progress,
                 Steps = steps.Select(s => new SkillPlanStepDto

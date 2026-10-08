@@ -49,7 +49,10 @@ namespace IRAS.Application.Modules.SkillImprovementPlans
                {"confidenceScore": <integer 0-100>, "rationale": "..."}
             """;
 
-        private static readonly JsonSerializerOptions JsonOpts = new(JsonSerializerDefaults.Web);
+        private static readonly JsonSerializerOptions JsonOpts = new(JsonSerializerDefaults.Web)
+        {
+            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
+        };
 
         private readonly HttpClient _http;
         private readonly GeminiOptions _options;
@@ -79,13 +82,22 @@ namespace IRAS.Application.Modules.SkillImprovementPlans
             var userPrompt = BuildUserPrompt(skillName, projectTitle, projectTask, projectExpectedOutput, evidenceType, evidenceUrl, candidateNotes);
 
             var requestBody = new GeminiRequest(
-                _options.Model, SystemPrompt, userPrompt, new GeminiGenerationConfig(1024, "minimal"));
+                new GeminiContent(null, [new GeminiPart(SystemPrompt)]),
+                [new GeminiContent("user", [new GeminiPart(userPrompt)])],
+                new GeminiGenerationConfig(1024, "application/json"));
 
             GeminiResponse? result;
             try
             {
-                var httpResponse = await _http.PostAsJsonAsync("/v1beta/interactions", requestBody, JsonOpts, ct);
-                httpResponse.EnsureSuccessStatusCode();
+                var endpoint = $"/v1beta/models/{Uri.EscapeDataString(_options.Model)}:generateContent";
+                var httpResponse = await _http.PostAsJsonAsync(endpoint, requestBody, JsonOpts, ct);
+                if (!httpResponse.IsSuccessStatusCode)
+                {
+                    var errorBody = await httpResponse.Content.ReadAsStringAsync(ct);
+                    _logger.LogError("Gemini evidence review failed for skill '{SkillName}'. Status={StatusCode}, Body={Body}",
+                        skillName, (int)httpResponse.StatusCode, errorBody);
+                    return new EvidenceReviewResult(50, "Automatic review failed - routed to manual review.");
+                }
                 result = await httpResponse.Content.ReadFromJsonAsync<GeminiResponse>(JsonOpts, ct);
             }
             catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or JsonException)
@@ -94,16 +106,15 @@ namespace IRAS.Application.Modules.SkillImprovementPlans
                 return new EvidenceReviewResult(50, "Automatic review failed — routed to manual review.");
             }
 
-            var text = (result?.Steps ?? new List<GeminiStep>())
-                .SelectMany(s => s.Content ?? new List<GeminiContentPart>())
-                .Where(c => c.Type == "text" && !string.IsNullOrWhiteSpace(c.Text))
-                .Select(c => c.Text)
+            var text = (result?.Candidates ?? new List<GeminiCandidate>())
+                .SelectMany(c => c.Content?.Parts ?? new List<GeminiResponsePart>())
+                .Where(p => !string.IsNullOrWhiteSpace(p.Text))
+                .Select(p => p.Text)
                 .FirstOrDefault();
 
             if (string.IsNullOrWhiteSpace(text))
             {
-                _logger.LogWarning("Gemini evidence review returned no text content for skill '{SkillName}' (status={Status})",
-                    skillName, result?.Status ?? "null");
+                _logger.LogWarning("Gemini evidence review returned no text content for skill '{SkillName}'", skillName);
                 return new EvidenceReviewResult(50, "Automatic review returned no result — routed to manual review.");
             }
 
@@ -160,17 +171,20 @@ namespace IRAS.Application.Modules.SkillImprovementPlans
 
         // Mirrors Gemini's Interactions API JSON shape — same schema as the other generators.
         private record GeminiRequest(
-            string Model,
-            [property: JsonPropertyName("system_instruction")] string SystemInstruction,
-            string Input,
-            [property: JsonPropertyName("generation_config")] GeminiGenerationConfig GenerationConfig);
+            [property: JsonPropertyName("systemInstruction")] GeminiContent SystemInstruction,
+            List<GeminiContent> Contents,
+            [property: JsonPropertyName("generationConfig")] GeminiGenerationConfig GenerationConfig);
+
+        private record GeminiContent(string? Role, List<GeminiPart> Parts);
+        private record GeminiPart(string Text);
 
         private record GeminiGenerationConfig(
-            [property: JsonPropertyName("max_output_tokens")] int MaxOutputTokens,
-            [property: JsonPropertyName("thinking_level")] string ThinkingLevel);
+            [property: JsonPropertyName("maxOutputTokens")] int MaxOutputTokens,
+            [property: JsonPropertyName("responseMimeType")] string ResponseMimeType);
 
-        private record GeminiResponse(string Status, List<GeminiStep>? Steps);
-        private record GeminiStep(List<GeminiContentPart>? Content);
-        private record GeminiContentPart(string Type, string? Text);
+        private record GeminiResponse(List<GeminiCandidate>? Candidates);
+        private record GeminiCandidate(GeminiResponseContent? Content);
+        private record GeminiResponseContent(List<GeminiResponsePart>? Parts);
+        private record GeminiResponsePart(string? Text);
     }
 }

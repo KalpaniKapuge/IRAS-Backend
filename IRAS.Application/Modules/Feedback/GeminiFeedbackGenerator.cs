@@ -43,7 +43,10 @@ namespace IRAS.Application.Modules.Feedback
                No Markdown headers, no preamble, no commentary before or after it.
             """;
 
-        private static readonly JsonSerializerOptions JsonOpts = new(JsonSerializerDefaults.Web);
+        private static readonly JsonSerializerOptions JsonOpts = new(JsonSerializerDefaults.Web)
+        {
+            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+        };
 
         private readonly HttpClient _http;
         private readonly GeminiOptions _options;
@@ -78,15 +81,18 @@ namespace IRAS.Application.Modules.Feedback
             // leaving thinking at its default risks consuming the token budget before the
             // actual feedback text is produced.
             var requestBody = new GeminiRequest(
-                _options.Model,
-                SystemPrompt,
-                userPrompt,
-                new GeminiGenerationConfig(2048, "minimal"));
+                new GeminiContent(new List<GeminiPart> { new(SystemPrompt) }),
+                new List<GeminiContent>
+                {
+                    new(new List<GeminiPart> { new(userPrompt) })
+                },
+                new GeminiGenerationConfig(2048, "text/plain"));
 
             GeminiResponse? result;
             try
             {
-                var httpResponse = await _http.PostAsJsonAsync("/v1beta/interactions", requestBody, JsonOpts, ct);
+                var endpoint = $"/v1beta/models/{Uri.EscapeDataString(_options.Model)}:generateContent";
+                var httpResponse = await _http.PostAsJsonAsync(endpoint, requestBody, JsonOpts, ct);
                 httpResponse.EnsureSuccessStatusCode();
                 result = await httpResponse.Content.ReadFromJsonAsync<GeminiResponse>(JsonOpts, ct);
             }
@@ -97,21 +103,18 @@ namespace IRAS.Application.Modules.Feedback
                     "The AI feedback service is temporarily unavailable. Please try again shortly.");
             }
 
-            var text = (result?.Steps ?? new List<GeminiStep>())
-                .SelectMany(s => s.Content ?? new List<GeminiContentPart>())
-                .Where(c => c.Type == "text" && !string.IsNullOrWhiteSpace(c.Text))
-                .Select(c => c.Text)
+            var text = (result?.Candidates ?? new List<GeminiCandidate>())
+                .SelectMany(c => c.Content?.Parts ?? new List<GeminiPart>())
+                .Select(p => p.Text)
+                .Where(t => !string.IsNullOrWhiteSpace(t))
                 .FirstOrDefault();
 
             if (string.IsNullOrWhiteSpace(text))
             {
                 _logger.LogError("Gemini feedback generation returned no text content for job '{JobTitle}' (status={Status})",
-                    jobTitle, result?.Status ?? "null");
+                    jobTitle, result is null ? "null" : "empty");
                 throw new InvalidOperationException("The AI service did not return feedback text. Please try again.");
             }
-
-            if (result!.Status == "incomplete")
-                _logger.LogWarning("Gemini feedback generation for job '{JobTitle}' was truncated (status=incomplete); returning partial text", jobTitle);
 
             return text.Trim();
         }
@@ -148,17 +151,17 @@ namespace IRAS.Application.Modules.Feedback
 
         // Mirrors Gemini's Interactions API JSON shape — same schema as GeminiJdGenerator.
         private record GeminiRequest(
-            string Model,
-            [property: JsonPropertyName("system_instruction")] string SystemInstruction,
-            string Input,
-            [property: JsonPropertyName("generation_config")] GeminiGenerationConfig GenerationConfig);
+            [property: JsonPropertyName("systemInstruction")] GeminiContent SystemInstruction,
+            [property: JsonPropertyName("contents")] List<GeminiContent> Contents,
+            [property: JsonPropertyName("generationConfig")] GeminiGenerationConfig GenerationConfig);
 
         private record GeminiGenerationConfig(
-            [property: JsonPropertyName("max_output_tokens")] int MaxOutputTokens,
-            [property: JsonPropertyName("thinking_level")] string ThinkingLevel);
+            [property: JsonPropertyName("maxOutputTokens")] int MaxOutputTokens,
+            [property: JsonPropertyName("responseMimeType")] string ResponseMimeType);
 
-        private record GeminiResponse(string Status, List<GeminiStep>? Steps);
-        private record GeminiStep(List<GeminiContentPart>? Content);
-        private record GeminiContentPart(string Type, string? Text);
+        private record GeminiResponse([property: JsonPropertyName("candidates")] List<GeminiCandidate>? Candidates);
+        private record GeminiCandidate([property: JsonPropertyName("content")] GeminiContent? Content);
+        private record GeminiContent([property: JsonPropertyName("parts")] List<GeminiPart>? Parts);
+        private record GeminiPart([property: JsonPropertyName("text")] string Text);
     }
 }
