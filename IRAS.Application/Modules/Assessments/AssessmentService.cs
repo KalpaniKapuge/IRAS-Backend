@@ -107,28 +107,35 @@ namespace IRAS.Application.Modules.Assessments
         {
             var attempt = await _db.CandidateAssessmentAttempts
                 .Include(a => a.JobAssessment).ThenInclude(ja => ja.Questions)
+                .Include(a => a.Answers)
                 .FirstOrDefaultAsync(a => a.CandidateId == candidateId && a.JobId == jobId, ct)
                 ?? throw new KeyNotFoundException("No assessment attempt found for this job.");
 
             if (attempt.Status != AssessmentAttemptStatus.InProgress)
                 throw new InvalidOperationException("This assessment has already been submitted.");
 
+            if (DateTime.UtcNow > ComputeDeadline(attempt))
+                throw new InvalidOperationException("The assessment time limit has expired.");
+
+            if (attempt.JobAssessment.Questions.Count == 0)
+                throw new InvalidOperationException("This assessment has no questions. Start the assessment again to generate a valid quiz.");
+
+            if (attempt.Answers.Count > 0)
+                throw new InvalidOperationException("This assessment has already recorded answers.");
+
             var questions = attempt.JobAssessment.Questions.ToDictionary(q => q.AssessmentQuestionId);
+            ValidateCompleteSubmission(request, questions);
+
             var answersByQuestionId = request.Answers
-                .Where(a => questions.ContainsKey(a.QuestionId))
                 .ToDictionary(a => a.QuestionId);
 
             var correctCount = 0;
             var answeredCount = 0;
             var totalScoreFraction = 0m;
-
-            // Grade every question the assessment has, not just the ones answered — a
-            // partial/empty submission (the timer ran out) is valid, and unanswered
-            // questions simply score 0. This is the "close the quiz and show marks for what
-            // was done" behavior.
+            // Every question already has a valid submitted answer here.
             foreach (var question in questions.Values.OrderBy(q => q.QuestionOrder))
             {
-                answersByQuestionId.TryGetValue(question.AssessmentQuestionId, out var answer);
+                var answer = answersByQuestionId[question.AssessmentQuestionId];
 
                 decimal scoreFraction;
                 int? selectedOptionIndex = null;
@@ -136,13 +143,13 @@ namespace IRAS.Application.Modules.Assessments
 
                 if (question.QuestionType == AssessmentQuestionType.MultipleChoice)
                 {
-                    selectedOptionIndex = answer?.SelectedOptionIndex;
+                    selectedOptionIndex = answer.SelectedOptionIndex;
                     scoreFraction = selectedOptionIndex.HasValue && selectedOptionIndex == question.CorrectOptionIndex ? 1m : 0m;
                     if (selectedOptionIndex.HasValue) answeredCount++;
                 }
                 else
                 {
-                    freeTextAnswer = answer?.FreeTextAnswer;
+                    freeTextAnswer = answer.FreeTextAnswer;
                     if (!string.IsNullOrWhiteSpace(freeTextAnswer))
                     {
                         answeredCount++;
@@ -246,7 +253,7 @@ namespace IRAS.Application.Modules.Assessments
             var existing = await _db.JobAssessments
                 .Include(a => a.Questions)
                 .FirstOrDefaultAsync(a => a.JobId == job.JobId, ct);
-            if (existing is not null)
+            if (existing is not null && existing.Questions.Count > 0)
                 return existing;
 
             var skills = job.RequiredSkills
@@ -278,7 +285,40 @@ namespace IRAS.Application.Modules.Assessments
             if (generated.Count == 0)
                 throw new InvalidOperationException("Unable to generate a skill assessment for this job. Please try again shortly.");
 
+            if (generated.Count < QuestionCount)
+            {
+                var fallback = await _fallbackGenerator.GenerateAsync(job, skills, QuestionCount, ct);
+                generated = generated
+                    .Concat(fallback)
+                    .Where(q => !string.IsNullOrWhiteSpace(q.QuestionText))
+                    .DistinctBy(q => q.QuestionText.Trim().ToUpperInvariant())
+                    .Take(QuestionCount)
+                    .ToList();
+
+                if (generated.Count == 0)
+                    throw new InvalidOperationException("Unable to generate a skill assessment for this job. Please try again shortly.");
+            }
+
             var skillIdByName = job.RequiredSkills.ToDictionary(rs => rs.Skill.SkillName, rs => rs.SkillId, StringComparer.OrdinalIgnoreCase);
+
+            if (existing is not null)
+            {
+                existing.GeneratedBy = usedGenerator.Name;
+                existing.GeneratedAt = DateTime.UtcNow;
+                existing.Questions = generated.Select((q, i) => new AssessmentQuestion
+                {
+                    QuestionType = q.QuestionType,
+                    QuestionText = q.QuestionText,
+                    Options = q.Options,
+                    CorrectOptionIndex = q.CorrectOptionIndex,
+                    ModelAnswer = q.ModelAnswer,
+                    QuestionOrder = i,
+                    SkillId = q.SkillName is not null && skillIdByName.TryGetValue(q.SkillName, out var skillId) ? skillId : null,
+                }).ToList();
+
+                await _db.SaveChangesAsync(ct);
+                return existing;
+            }
 
             var assessment = new JobAssessment
             {
@@ -311,5 +351,49 @@ namespace IRAS.Application.Modules.Assessments
                     Options = q.Options,
                 })
                 .ToList();
+
+        private static void ValidateCompleteSubmission(
+            SubmitAssessmentRequest request,
+            IReadOnlyDictionary<int, AssessmentQuestion> questions)
+        {
+            if (request.Answers is null)
+                throw new InvalidOperationException("Answer every assessment question before submitting.");
+
+            if (request.Answers.Count != questions.Count)
+                throw new InvalidOperationException("Answer every assessment question before submitting.");
+
+            var duplicateQuestionIds = request.Answers
+                .GroupBy(a => a.QuestionId)
+                .Where(g => g.Count() > 1)
+                .Select(g => g.Key)
+                .ToList();
+            if (duplicateQuestionIds.Count > 0)
+                throw new ArgumentException($"Duplicate answers submitted for question id(s): {string.Join(", ", duplicateQuestionIds)}.");
+
+            var submittedIds = request.Answers.Select(a => a.QuestionId).ToHashSet();
+            var missingIds = questions.Keys.Where(id => !submittedIds.Contains(id)).ToList();
+            if (missingIds.Count > 0)
+                throw new InvalidOperationException("Answer every assessment question before submitting.");
+
+            var unknownIds = submittedIds.Where(id => !questions.ContainsKey(id)).ToList();
+            if (unknownIds.Count > 0)
+                throw new ArgumentException($"Unknown assessment question id(s): {string.Join(", ", unknownIds)}.");
+
+            foreach (var answer in request.Answers)
+            {
+                var question = questions[answer.QuestionId];
+                if (question.QuestionType == AssessmentQuestionType.MultipleChoice)
+                {
+                    if (!answer.SelectedOptionIndex.HasValue)
+                        throw new InvalidOperationException("Answer every multiple-choice question before submitting.");
+                    if (answer.SelectedOptionIndex < 0 || answer.SelectedOptionIndex >= question.Options.Count)
+                        throw new ArgumentException($"Selected option is invalid for question id {answer.QuestionId}.");
+                }
+                else if (string.IsNullOrWhiteSpace(answer.FreeTextAnswer))
+                {
+                    throw new InvalidOperationException("Answer every written question before submitting.");
+                }
+            }
+        }
     }
 }
