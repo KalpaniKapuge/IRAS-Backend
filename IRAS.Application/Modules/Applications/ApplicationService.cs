@@ -110,7 +110,7 @@ namespace IRAS.Application.Modules.Applications
             var experienceMatch = _scoring.ComputeExperienceMatch(candidate.TotalExpYears, job.MinExpYears);
             var educationMatch = _scoring.ComputeEducationMatch(candidate.EducationLevel, job.EducationReq);
             var matchSignals = await _scoring.ComputeMatchSignalAsync(candidateId, resume.ParsedText!, job, ct);
-            var semanticSimilarity = EffectiveResumeRelevance(matchSignals.SemanticSimilarity, skillMatch);
+            var semanticSimilarity = matchSignals.SemanticSimilarity;
             var assessmentScore = await _assessments.GetScoreAsync(candidateId, request.JobId, ct);
 
             var totalScore = _scoring.ComputeTotalScore(skillMatch, semanticSimilarity, matchSignals.MlFitScore, assessmentScore);
@@ -172,20 +172,23 @@ namespace IRAS.Application.Modules.Applications
                 .Where(a => a.ApplicationId == application.ApplicationId)
                 .Select(ToApplicationDtoProjection)
                 .FirstAsync(ct);
-            NormalizeScores(created);
             return created;
         }
 
         public async Task<List<ApplicationDto>> GetMyApplicationsAsync(int candidateId, CancellationToken ct)
         {
-            var applications = await _db.Applications
+            var applicationEntities = await _db.Applications
+                .Include(a => a.Job).ThenInclude(j => j.Employer)
+                .Include(a => a.Resume)
+                .Include(a => a.SkillGaps).ThenInclude(g => g.Skill)
                 .Where(a => a.CandidateId == candidateId)
                 .OrderByDescending(a => a.AppliedAt)
-                .Select(ToApplicationDtoProjection)
                 .ToListAsync(ct);
 
-            foreach (var application in applications)
-                NormalizeScores(application);
+            foreach (var application in applicationEntities)
+                await RefreshAiScoresIfNeededAsync(application, ct);
+
+            var applications = applicationEntities.Select(ToApplicationDto).ToList();
 
             return applications;
         }
@@ -196,6 +199,32 @@ namespace IRAS.Application.Modules.Applications
                 ?? throw new KeyNotFoundException("Job not found.");
             if (job.EmployerId != employerId)
                 throw new KeyNotFoundException("Job not found.");
+
+            var staleApplications = await _db.Applications
+                .Include(a => a.Resume)
+                .Where(a => a.JobId == jobId && a.SemanticSimilarity <= 0m && a.Resume.ParsedText != null)
+                .ToListAsync(ct);
+            if (staleApplications.Count > 0)
+            {
+                var signalsByCandidate = await _scoring.ComputeMatchSignalsAsync(
+                    job,
+                    staleApplications.Select(a => (a.CandidateId, ResumeText: a.Resume.ParsedText!)).ToList(),
+                    ct);
+
+                foreach (var application in staleApplications)
+                {
+                    if (!signalsByCandidate.TryGetValue(application.CandidateId, out var signals))
+                        continue;
+                    if (signals.SemanticSimilarity <= 0m && signals.MlFitScore is null)
+                        continue;
+
+                    application.SemanticSimilarity = signals.SemanticSimilarity;
+                    application.TotalScore = _scoring.ComputeTotalScore(
+                        application.SkillMatch, application.SemanticSimilarity, signals.MlFitScore, application.AssessmentScore);
+                }
+
+                await _db.SaveChangesAsync(ct);
+            }
 
             var applicants = await _db.Applications
                 .Where(a => a.JobId == jobId)
@@ -229,9 +258,6 @@ namespace IRAS.Application.Modules.Applications
             // they're filled in after materializing rather than inside the Select above.
             foreach (var applicant in applicants)
             {
-                applicant.SemanticSimilarity = EffectiveResumeRelevance(applicant.SemanticSimilarity, applicant.SkillMatch);
-                applicant.TotalScore = _scoring.ComputeTotalScore(
-                    applicant.SkillMatch, applicant.SemanticSimilarity, assessmentScore: applicant.AssessmentScore);
                 applicant.TotalMarks = _scoring.ComputeTotalMarks(
                     applicant.SkillMatch, applicant.ExperienceMatch, applicant.EducationMatch,
                     applicant.SemanticSimilarity, applicant.AssessmentScore);
@@ -243,15 +269,44 @@ namespace IRAS.Application.Modules.Applications
             return applicants.OrderByDescending(a => a.TotalMarks).ToList();
         }
 
-        private void NormalizeScores(ApplicationDto application)
+        private async Task RefreshAiScoresIfNeededAsync(AppEntity application, CancellationToken ct)
         {
-            application.SemanticSimilarity = EffectiveResumeRelevance(application.SemanticSimilarity, application.SkillMatch);
+            if (application.SemanticSimilarity > 0m || string.IsNullOrWhiteSpace(application.Resume.ParsedText))
+                return;
+
+            var signals = await _scoring.ComputeMatchSignalAsync(
+                application.CandidateId, application.Resume.ParsedText!, application.Job, ct);
+            if (signals.SemanticSimilarity <= 0m && signals.MlFitScore is null)
+                return;
+
+            application.SemanticSimilarity = signals.SemanticSimilarity;
             application.TotalScore = _scoring.ComputeTotalScore(
-                application.SkillMatch, application.SemanticSimilarity, assessmentScore: application.AssessmentScore);
+                application.SkillMatch, application.SemanticSimilarity, signals.MlFitScore, application.AssessmentScore);
+            await _db.SaveChangesAsync(ct);
         }
 
-        private static decimal EffectiveResumeRelevance(decimal semanticSimilarity, decimal skillMatch) =>
-            semanticSimilarity > 0m ? semanticSimilarity : skillMatch;
+        private static ApplicationDto ToApplicationDto(AppEntity a) => new()
+        {
+            ApplicationId = a.ApplicationId,
+            JobId = a.JobId,
+            JobTitle = a.Job.Title,
+            CompanyName = a.Job.Employer.CompanyName,
+            Status = a.Status.ToString(),
+            TotalScore = a.TotalScore,
+            SkillMatch = a.SkillMatch,
+            ExperienceMatch = a.ExperienceMatch,
+            EducationMatch = a.EducationMatch,
+            SemanticSimilarity = a.SemanticSimilarity,
+            AssessmentScore = a.AssessmentScore,
+            AppliedAt = a.AppliedAt,
+            SkillGaps = a.SkillGaps.Select(g => new SkillGapDto
+            {
+                SkillId = g.SkillId,
+                SkillName = g.Skill.SkillName,
+                Importance = g.Importance.ToString(),
+                Suggestion = g.Suggestion
+            }).ToList()
+        };
 
         // Every resume saved through the currently-registered IFileStorage (Supabase or Local)
         // already returns a full absolute URL from SaveAsync — so a bare relative FileUrl can

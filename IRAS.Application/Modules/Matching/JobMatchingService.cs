@@ -79,7 +79,7 @@ namespace IRAS.Application.Modules.Matching
                 var skillIds = candidateSkillMap.GetValueOrDefault(candidateId, Array.Empty<int>());
                 var skillMatch = _scoring.ComputeSkillMatch(job.RequiredSkills, skillIds);
                 var signals = matchSignals.GetValueOrDefault(candidateId, new MatchSignals(0m, null));
-                var semanticSimilarity = signals.SemanticSimilarity > 0m ? signals.SemanticSimilarity : skillMatch;
+                var semanticSimilarity = signals.SemanticSimilarity;
                 var matchScore = _scoring.ComputeTotalScore(skillMatch, semanticSimilarity, signals.MlFitScore);
                 var passed = matchScore >= _options.AutoMatchThreshold;
 
@@ -203,7 +203,7 @@ namespace IRAS.Application.Modules.Matching
             {
                 var skillMatch = _scoring.ComputeSkillMatch(job.RequiredSkills, candidateSkillIds);
                 var signals = signalsByJob.GetValueOrDefault(job.JobId, new MatchSignals(0m, null));
-                var semanticSimilarity = signals.SemanticSimilarity > 0m ? signals.SemanticSimilarity : skillMatch;
+                var semanticSimilarity = signals.SemanticSimilarity;
                 return new JobRecommendationDto
                 {
                     JobId = job.JobId,
