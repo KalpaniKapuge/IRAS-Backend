@@ -79,7 +79,8 @@ namespace IRAS.Application.Modules.Matching
                 var skillIds = candidateSkillMap.GetValueOrDefault(candidateId, Array.Empty<int>());
                 var skillMatch = _scoring.ComputeSkillMatch(job.RequiredSkills, skillIds);
                 var signals = matchSignals.GetValueOrDefault(candidateId, new MatchSignals(0m, null));
-                var matchScore = _scoring.ComputeTotalScore(skillMatch, signals.SemanticSimilarity, signals.MlFitScore);
+                var semanticSimilarity = signals.SemanticSimilarity > 0m ? signals.SemanticSimilarity : skillMatch;
+                var matchScore = _scoring.ComputeTotalScore(skillMatch, semanticSimilarity, signals.MlFitScore);
                 var passed = matchScore >= _options.AutoMatchThreshold;
 
                 _db.JobMatches.Add(new JobMatch
@@ -160,14 +161,15 @@ namespace IRAS.Application.Modules.Matching
             {
                 var skillMatch = _scoring.ComputeSkillMatch(job.RequiredSkills, candidateSkillIds);
                 var signals = signalsByJob.GetValueOrDefault(job.JobId, new MatchSignals(0m, null));
+                var semanticSimilarity = signals.SemanticSimilarity > 0m ? signals.SemanticSimilarity : skillMatch;
                 return new JobRecommendationDto
                 {
                     JobId = job.JobId,
                     JobTitle = job.Title,
                     CompanyName = job.Employer.CompanyName,
-                    MatchScore = _scoring.ComputeTotalScore(skillMatch, signals.SemanticSimilarity, signals.MlFitScore),
+                    MatchScore = _scoring.ComputeTotalScore(skillMatch, semanticSimilarity, signals.MlFitScore),
                     SkillMatch = skillMatch,
-                    SemanticSimilarity = signals.SemanticSimilarity,
+                    SemanticSimilarity = semanticSimilarity,
                     MlFitScore = signals.MlFitScore
                 };
             });

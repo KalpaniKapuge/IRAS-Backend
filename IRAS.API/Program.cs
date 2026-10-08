@@ -125,7 +125,9 @@ builder.Services.AddHttpClient<IRAS.Application.Common.Ai.IAiServiceClient,
                                IRAS.Application.Common.Ai.AiServiceClient>((sp, client) =>
 {
     var opts = builder.Configuration.GetSection(AiServiceOptions.SectionName).Get<AiServiceOptions>()!;
-    client.BaseAddress = new Uri(opts.BaseUrl);
+    client.BaseAddress = Uri.TryCreate(opts.BaseUrl, UriKind.Absolute, out var aiBaseUrl)
+        ? aiBaseUrl
+        : new Uri("http://127.0.0.1:9");
     client.Timeout = TimeSpan.FromSeconds(opts.TimeoutSeconds);
 });
 

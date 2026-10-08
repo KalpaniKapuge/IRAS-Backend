@@ -67,6 +67,7 @@ namespace IRAS.Application.Modules.Assessments
 
             var existing = await _db.CandidateAssessmentAttempts
                 .Include(a => a.JobAssessment).ThenInclude(ja => ja.Questions)
+                .Include(a => a.Answers)
                 .FirstOrDefaultAsync(a => a.CandidateId == candidateId && a.JobId == jobId, ct);
 
             if (existing is { Status: AssessmentAttemptStatus.Completed })
@@ -74,13 +75,22 @@ namespace IRAS.Application.Modules.Assessments
 
             if (existing is not null)
             {
-                if (existing.JobAssessment.Questions.Count == 0)
+                if (existing.Answers.Count > 0)
+                    _db.CandidateAssessmentAnswers.RemoveRange(existing.Answers);
+
+                if (existing.JobAssessment.Questions.Count == 0
+                    || !await HasCompletedAttemptForAssessmentAsync(existing.JobAssessmentId, ct))
                 {
                     var repaired = await RepairAssessmentQuestionsAsync(job, existing.JobAssessment, ct);
                     existing.JobAssessment = repaired;
                     existing.JobAssessmentId = repaired.JobAssessmentId;
-                    await _db.SaveChangesAsync(ct);
                 }
+
+                existing.Status = AssessmentAttemptStatus.InProgress;
+                existing.Score = null;
+                existing.CompletedAt = null;
+                existing.StartedAt = DateTime.UtcNow;
+                await _db.SaveChangesAsync(ct);
 
                 return new StartAssessmentResponse
                 {
@@ -121,9 +131,6 @@ namespace IRAS.Application.Modules.Assessments
 
             if (attempt.Status != AssessmentAttemptStatus.InProgress)
                 throw new InvalidOperationException("This assessment has already been submitted.");
-
-            if (DateTime.UtcNow > ComputeDeadline(attempt))
-                throw new InvalidOperationException("The assessment time limit has expired.");
 
             if (attempt.JobAssessment.Questions.Count == 0)
                 throw new InvalidOperationException("This assessment has no questions. Start the assessment again to generate a valid quiz.");
@@ -256,6 +263,10 @@ namespace IRAS.Application.Modules.Assessments
         private static DateTime ComputeDeadline(CandidateAssessmentAttempt attempt) =>
             attempt.StartedAt.AddSeconds(attempt.JobAssessment.Questions.Count * SecondsPerQuestion);
 
+        private Task<bool> HasCompletedAttemptForAssessmentAsync(int jobAssessmentId, CancellationToken ct) =>
+            _db.CandidateAssessmentAttempts.AnyAsync(
+                a => a.JobAssessmentId == jobAssessmentId && a.Status == AssessmentAttemptStatus.Completed, ct);
+
         private async Task<JobAssessment> RepairAssessmentQuestionsAsync(Job job, JobAssessment assessment, CancellationToken ct)
         {
             var skills = job.RequiredSkills
@@ -293,6 +304,12 @@ namespace IRAS.Application.Modules.Assessments
                 throw new InvalidOperationException("Unable to generate a skill assessment for this job. Please try again shortly.");
 
             var skillIdByName = job.RequiredSkills.ToDictionary(rs => rs.Skill.SkillName, rs => rs.SkillId, StringComparer.OrdinalIgnoreCase);
+            if (assessment.Questions.Count > 0)
+            {
+                _db.AssessmentQuestions.RemoveRange(assessment.Questions);
+                assessment.Questions.Clear();
+            }
+
             assessment.GeneratedBy = usedGenerator.Name;
             assessment.GeneratedAt = DateTime.UtcNow;
             assessment.Questions = generated.Select((q, i) => new AssessmentQuestion
