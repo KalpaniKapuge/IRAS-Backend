@@ -52,7 +52,11 @@ namespace IRAS.Application.Modules.Chat
             {
                 try
                 {
-                    reply = await _responder.RespondAsync(request.Message, context, ct);
+                    using var responderTimeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
+                    if (_responder.IsAi)
+                        responderTimeout.CancelAfter(TimeSpan.FromSeconds(6));
+
+                    reply = await _responder.RespondAsync(request.Message, context, responderTimeout.Token);
                     if (_responder.IsAi && string.Equals(reply.Intent, "Error", StringComparison.OrdinalIgnoreCase))
                         reply = deterministicReply;
                 }

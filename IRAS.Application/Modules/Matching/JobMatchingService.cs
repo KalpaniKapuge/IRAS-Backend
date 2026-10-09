@@ -7,6 +7,7 @@ using IRAS.Application.Modules.Matching.DTOs;
 using IRAS.Domain.Entities.Jobs;
 using IRAS.Domain.Enums;
 using IRAS.Infrastructure.Data;
+using System.Text.RegularExpressions;
 
 namespace IRAS.Application.Modules.Matching
 {
@@ -205,18 +206,24 @@ namespace IRAS.Application.Modules.Matching
             Dictionary<int, MatchSignals> signalsByJob;
             try
             {
+                using var aiTimeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
+                aiTimeout.CancelAfter(TimeSpan.FromSeconds(4));
                 signalsByJob = await _scoring.ComputeMatchSignalsForCandidateAsync(
-                    candidateId, candidate.ResumeText!, jobs, ct);
+                    candidateId, candidate.ResumeText!, jobs, aiTimeout.Token);
             }
             catch (Exception) when (!ct.IsCancellationRequested)
             {
-                signalsByJob = new Dictionary<int, MatchSignals>();
+                signalsByJob = jobs.ToDictionary(
+                    job => job.JobId,
+                    job => new MatchSignals(ComputeLexicalResumeRelevance(JobText(job), candidate.ResumeText!), null));
             }
 
             var recommendations = jobs.Select(job =>
             {
                 var skillMatch = _scoring.ComputeSkillMatch(job.RequiredSkills, candidateSkillIds);
-                var signals = signalsByJob.GetValueOrDefault(job.JobId, new MatchSignals(0m, null));
+                var signals = signalsByJob.GetValueOrDefault(
+                    job.JobId,
+                    new MatchSignals(ComputeLexicalResumeRelevance(JobText(job), candidate.ResumeText!), null));
                 return new JobRecommendationDto
                 {
                     JobId = job.JobId,
@@ -232,5 +239,52 @@ namespace IRAS.Application.Modules.Matching
 
             return recommendations.OrderByDescending(r => r.MatchScore).Take(20).ToList();
         }
+
+        private static string JobText(Job job)
+        {
+            var requiredSkills = string.Join(' ', job.RequiredSkills.Select(rs => rs.Skill.SkillName));
+            return string.Join(' ', new[]
+            {
+                job.Title,
+                FirstNonBlank(job.GeneratedJd, job.RequirementInput),
+                requiredSkills
+            }.Where(text => !string.IsNullOrWhiteSpace(text)));
+        }
+
+        private static string FirstNonBlank(params string?[] values)
+            => values.FirstOrDefault(value => !string.IsNullOrWhiteSpace(value)) ?? string.Empty;
+
+        private static decimal ComputeLexicalResumeRelevance(string jobText, string resumeText)
+        {
+            var jobTokens = Tokenize(jobText).ToHashSet();
+            var resumeTokens = Tokenize(resumeText).ToHashSet();
+            if (jobTokens.Count == 0 || resumeTokens.Count == 0) return 0m;
+
+            var overlap = jobTokens.Count(resumeTokens.Contains);
+            var precision = (decimal)overlap / resumeTokens.Count;
+            var recall = (decimal)overlap / jobTokens.Count;
+            var f1 = precision + recall == 0m ? 0m : 2m * precision * recall / (precision + recall);
+
+            var requiredSkills = jobTokens.Where(t => t.Length > 1).ToList();
+            var skillCoverage = requiredSkills.Count == 0
+                ? 0m
+                : (decimal)requiredSkills.Count(resumeTokens.Contains) / requiredSkills.Count;
+
+            return Math.Clamp((0.65m * skillCoverage) + (0.35m * f1), 0m, 1m);
+        }
+
+        private static IEnumerable<string> Tokenize(string text)
+        {
+            return Regex.Matches(text.ToLowerInvariant(), "[a-z][a-z0-9+#.]{1,}")
+                .Select(m => m.Value.Trim('.', '#'))
+                .Where(t => t.Length > 1 && !ResumeRelevanceStopWords.Contains(t));
+        }
+
+        private static readonly HashSet<string> ResumeRelevanceStopWords = new(StringComparer.OrdinalIgnoreCase)
+        {
+            "and", "the", "for", "with", "from", "that", "this", "will", "you", "your", "our", "are",
+            "job", "role", "work", "team", "using", "use", "have", "has", "must", "nice", "good",
+            "candidate", "developer", "engineer", "experience", "skills", "skill", "required"
+        };
     }
 }

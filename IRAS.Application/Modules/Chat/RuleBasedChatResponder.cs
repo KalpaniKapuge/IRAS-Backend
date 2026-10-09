@@ -24,6 +24,15 @@ namespace IRAS.Application.Modules.Chat
             if (!ChatScopeGate.IsInScope(tokens, context.Role))
                 return Task.FromResult(new ChatReply(ChatScopeGate.OutOfScopeMessage, "OutOfScope"));
 
+            if (context.Candidate is not null
+                && tokens.Contains("job")
+                && tokens.Overlaps(new[] { "post", "posting", "postings", "publish", "create", "make", "add" }))
+            {
+                return Task.FromResult(new ChatReply(
+                    "Candidate accounts cannot create job posts. As a candidate, use Browse Jobs to view published jobs, Job Matches to see recommended jobs, and My Applications to track jobs you applied for. Job posting is available only from an employer account.",
+                    "JobPosting.NotCandidateAction"));
+            }
+
             if (context.Employer is not null
                 && tokens.Overlaps(new[] { "interview", "interviews" })
                 && tokens.Overlaps(new[] { "process", "create", "schedule", "scheduled", "select", "selected", "candidate", "applicant" }))
