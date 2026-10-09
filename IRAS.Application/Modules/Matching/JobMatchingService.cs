@@ -30,7 +30,7 @@ namespace IRAS.Application.Modules.Matching
         public async Task RunMatchingForJobAsync(int jobId, CancellationToken ct)
         {
             var job = await _db.Jobs
-                .Include(j => j.RequiredSkills)
+                .Include(j => j.RequiredSkills).ThenInclude(rs => rs.Skill)
                 .Include(j => j.Employer)
                 .FirstOrDefaultAsync(j => j.JobId == jobId, ct);
             if (job is null || job.Status != JobStatus.Published) return;
@@ -193,7 +193,7 @@ namespace IRAS.Application.Modules.Matching
 
             var jobs = await _db.Jobs
                 .Where(j => j.Status == JobStatus.Published)
-                .Include(j => j.RequiredSkills)
+                .Include(j => j.RequiredSkills).ThenInclude(rs => rs.Skill)
                 .Include(j => j.Employer)
                 .ToListAsync(ct);
             var appliedJobIds = await _db.Applications

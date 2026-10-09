@@ -171,7 +171,7 @@ namespace IRAS.Application.Common.Scoring
         {
             var primaryText = FirstNonBlank(job.GeneratedJd, job.RequirementInput, job.Title);
             var requiredSkills = job.RequiredSkills
-                .Select(rs => rs.Skill.SkillName)
+                .Select(rs => rs.Skill?.SkillName)
                 .Where(s => !string.IsNullOrWhiteSpace(s));
             return string.Join(' ', new[] { primaryText }.Concat(requiredSkills));
         }

@@ -24,6 +24,33 @@ namespace IRAS.Application.Modules.Chat
             if (!ChatScopeGate.IsInScope(tokens, context.Role))
                 return Task.FromResult(new ChatReply(ChatScopeGate.OutOfScopeMessage, "OutOfScope"));
 
+            if (context.Candidate is not null && tokens.Overlaps(new[] { "resume", "resumes", "cv" })
+                && tokens.Overlaps(new[] { "upload", "uploaded", "parse", "parsed", "parsing" }))
+            {
+                return Task.FromResult(new ChatReply(
+                    "To upload a resume, go to Resumes from the left menu, choose your PDF or DOCX file, and submit it. IRAS saves the file, extracts the resume text, detects your skills from the taxonomy, and uses that parsed resume for job matching, resume relevance, and applications.",
+                    "ResumeUpload.HowTo"));
+            }
+
+            if (context.Candidate is not null && tokens.Overlaps(new[] { "score", "scores", "scoring", "relevance" }))
+            {
+                return Task.FromResult(new ChatReply(
+                    "Candidate scores combine skill match, resume relevance, AI fit, and assessment score when available. Skill match comes from required-skill overlap, while resume relevance comes from comparing the job description with your parsed resume text.",
+                    "CandidateScoring.HowTo"));
+            }
+
+            if (context.Employer is not null && tokens.Overlaps(new[] { "post", "posting", "job", "description", "generate" }))
+            {
+                return Task.FromResult(new ChatReply(
+                    "As an employer, create a job posting from Browse/Jobs management, enter the role details and required skills, then use Generate Description if you want IRAS to draft a professional job description from those inputs.",
+                    "JobPosting.HowTo"));
+            }
+
+            if (context.Admin is not null && tokens.Overlaps(new[] { "user", "users", "dashboard", "report", "reports", "statistics" }))
+            {
+                return Task.FromResult(new ChatReply(BuildAdminStatsMessage(context.Admin), "AdminOverview.HowTo"));
+            }
+
             var best = BestKnowledgeBaseMatch(tokens, context.KnowledgeBase);
             if (best is not null)
                 return Task.FromResult(new ChatReply(best.Content, $"KnowledgeBase:{best.Title}"));
