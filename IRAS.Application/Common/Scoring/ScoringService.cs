@@ -6,6 +6,7 @@ using IRAS.Application.Common.Ai;
 using IRAS.Domain.Entities.Jobs;
 using IRAS.Domain.Enums;
 using IRAS.Infrastructure.Data;
+using System.Text.RegularExpressions;
 
 namespace IRAS.Application.Common.Scoring
 {
@@ -105,7 +106,9 @@ namespace IRAS.Application.Common.Scoring
             if (!rankResult.Success)
             {
                 _logger.LogWarning("Match signals unavailable for job {JobId}: {Error}", job.JobId, rankResult.Error);
-                return candidates.ToDictionary(c => c.CandidateId, _ => new MatchSignals(0m, null));
+                return candidates.ToDictionary(
+                    c => c.CandidateId,
+                    c => new MatchSignals(ComputeLexicalResumeRelevance(JobText(job), c.ResumeText), null));
             }
 
             var signals = rankResult.Results.ToDictionary(
@@ -114,7 +117,7 @@ namespace IRAS.Application.Common.Scoring
             // Guarantee every requested candidate has an entry even if the AI service
             // silently dropped one — callers index this dictionary without a TryGetValue.
             foreach (var c in candidates)
-                signals.TryAdd(c.CandidateId, new MatchSignals(0m, null));
+                signals.TryAdd(c.CandidateId, new MatchSignals(ComputeLexicalResumeRelevance(JobText(job), c.ResumeText), null));
             return signals;
         }
 
@@ -140,7 +143,7 @@ namespace IRAS.Application.Common.Scoring
                     var rank = await _ai.RankAsync(JobText(job), candidateInput, taxonomy, ct);
                     var signals = rank.Success && rank.Results.Count > 0
                         ? ToSignals(rank.Results[0].SemanticSimilarity, rank.Results[0].FitScore)
-                        : new MatchSignals(0m, null);
+                        : new MatchSignals(ComputeLexicalResumeRelevance(JobText(job), resumeText), null);
                     if (!rank.Success)
                         _logger.LogWarning("Match signal unavailable for job {JobId}: {Error}", job.JobId, rank.Error);
                     return (job.JobId, signals);
@@ -164,9 +167,43 @@ namespace IRAS.Application.Common.Scoring
                 .Select(s => new TaxonomyItem(s.SkillId, s.SkillName, s.Aliases.Select(a => a.AliasText).ToList()))
                 .ToListAsync(ct);
 
-        private static string JobText(Job job) => job.GeneratedJd ?? job.RequirementInput ?? job.Title;
+        private static string JobText(Job job)
+        {
+            var primaryText = FirstNonBlank(job.GeneratedJd, job.RequirementInput, job.Title);
+            var requiredSkills = job.RequiredSkills
+                .Select(rs => rs.Skill.SkillName)
+                .Where(s => !string.IsNullOrWhiteSpace(s));
+            return string.Join(' ', new[] { primaryText }.Concat(requiredSkills));
+        }
 
         private static MatchSignals ToSignals(decimal semanticSimilarity, decimal? fitScore) =>
             new(Math.Round(semanticSimilarity, 4), fitScore.HasValue ? Math.Round(fitScore.Value, 4) : null);
+
+        private static string FirstNonBlank(params string?[] values) =>
+            values.FirstOrDefault(v => !string.IsNullOrWhiteSpace(v))?.Trim() ?? string.Empty;
+
+        private static decimal ComputeLexicalResumeRelevance(string jobText, string resumeText)
+        {
+            var jobTerms = Tokenize(jobText).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var resumeTerms = Tokenize(resumeText).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            if (jobTerms.Count == 0 || resumeTerms.Count == 0)
+                return 0m;
+
+            var overlap = jobTerms.Count(resumeTerms.Contains);
+            var cosine = overlap / Math.Sqrt(jobTerms.Count * resumeTerms.Count);
+            return Math.Round((decimal)Math.Clamp(cosine, 0d, 1d), 4);
+        }
+
+        private static IEnumerable<string> Tokenize(string text) =>
+            Regex.Matches(text.ToLowerInvariant(), "[a-z0-9+#.]{2,}")
+                .Select(m => m.Value)
+                .Where(t => !StopWords.Contains(t));
+
+        private static readonly HashSet<string> StopWords = new(StringComparer.OrdinalIgnoreCase)
+        {
+            "the", "and", "for", "with", "you", "your", "are", "this", "that", "will",
+            "from", "have", "has", "our", "job", "role", "work", "team", "using",
+            "use", "can", "able", "about", "into", "such", "their", "they", "them"
+        };
     }
 }
