@@ -43,15 +43,23 @@ namespace IRAS.Application.Modules.Chat
 
             var context = await BuildContextAsync(userId, role, ct);
             ChatReply reply;
-            try
+            var deterministicReply = await _fallbackResponder.RespondAsync(request.Message, context, ct);
+            if (!string.Equals(deterministicReply.Intent, "Unmatched", StringComparison.OrdinalIgnoreCase))
             {
-                reply = await _responder.RespondAsync(request.Message, context, ct);
-                if (_responder.IsAi && string.Equals(reply.Intent, "Error", StringComparison.OrdinalIgnoreCase))
-                    reply = await _fallbackResponder.RespondAsync(request.Message, context, ct);
+                reply = deterministicReply;
             }
-            catch (Exception) when (!ct.IsCancellationRequested)
+            else
             {
-                reply = await _fallbackResponder.RespondAsync(request.Message, context, ct);
+                try
+                {
+                    reply = await _responder.RespondAsync(request.Message, context, ct);
+                    if (_responder.IsAi && string.Equals(reply.Intent, "Error", StringComparison.OrdinalIgnoreCase))
+                        reply = deterministicReply;
+                }
+                catch (Exception) when (!ct.IsCancellationRequested)
+                {
+                    reply = await _fallbackResponder.RespondAsync(request.Message, context, ct);
+                }
             }
 
             _db.ChatMessages.Add(new ChatMessage

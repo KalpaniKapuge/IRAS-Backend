@@ -111,9 +111,13 @@ namespace IRAS.Application.Common.Scoring
                     c => new MatchSignals(ComputeLexicalResumeRelevance(JobText(job), c.ResumeText), null));
             }
 
+            var resumeByCandidate = candidates.ToDictionary(c => c.CandidateId, c => c.ResumeText);
+            var jobText = JobText(job);
             var signals = rankResult.Results.ToDictionary(
                 r => r.CandidateId,
-                r => ToSignals(r.SemanticSimilarity, r.FitScore));
+                r => ToSignals(
+                    EffectiveResumeRelevance(r.SemanticSimilarity, jobText, resumeByCandidate.GetValueOrDefault(r.CandidateId) ?? string.Empty),
+                    r.FitScore));
             // Guarantee every requested candidate has an entry even if the AI service
             // silently dropped one — callers index this dictionary without a TryGetValue.
             foreach (var c in candidates)
@@ -140,10 +144,11 @@ namespace IRAS.Application.Common.Scoring
                 await gate.WaitAsync(ct);
                 try
                 {
-                    var rank = await _ai.RankAsync(JobText(job), candidateInput, taxonomy, ct);
+                    var jobText = JobText(job);
+                    var rank = await _ai.RankAsync(jobText, candidateInput, taxonomy, ct);
                     var signals = rank.Success && rank.Results.Count > 0
-                        ? ToSignals(rank.Results[0].SemanticSimilarity, rank.Results[0].FitScore)
-                        : new MatchSignals(ComputeLexicalResumeRelevance(JobText(job), resumeText), null);
+                        ? ToSignals(EffectiveResumeRelevance(rank.Results[0].SemanticSimilarity, jobText, resumeText), rank.Results[0].FitScore)
+                        : new MatchSignals(ComputeLexicalResumeRelevance(jobText, resumeText), null);
                     if (!rank.Success)
                         _logger.LogWarning("Match signal unavailable for job {JobId}: {Error}", job.JobId, rank.Error);
                     return (job.JobId, signals);
@@ -178,6 +183,9 @@ namespace IRAS.Application.Common.Scoring
 
         private static MatchSignals ToSignals(decimal semanticSimilarity, decimal? fitScore) =>
             new(Math.Round(semanticSimilarity, 4), fitScore.HasValue ? Math.Round(fitScore.Value, 4) : null);
+
+        private static decimal EffectiveResumeRelevance(decimal semanticSimilarity, string jobText, string resumeText) =>
+            Math.Max(Math.Round(semanticSimilarity, 4), ComputeLexicalResumeRelevance(jobText, resumeText));
 
         private static string FirstNonBlank(params string?[] values) =>
             values.FirstOrDefault(v => !string.IsNullOrWhiteSpace(v))?.Trim() ?? string.Empty;

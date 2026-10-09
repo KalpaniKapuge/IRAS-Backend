@@ -24,6 +24,15 @@ namespace IRAS.Application.Modules.Chat
             if (!ChatScopeGate.IsInScope(tokens, context.Role))
                 return Task.FromResult(new ChatReply(ChatScopeGate.OutOfScopeMessage, "OutOfScope"));
 
+            if (context.Employer is not null
+                && tokens.Overlaps(new[] { "interview", "interviews" })
+                && tokens.Overlaps(new[] { "process", "create", "schedule", "scheduled", "select", "selected", "candidate", "applicant" }))
+            {
+                return Task.FromResult(new ChatReply(
+                    "To create an interview for a selected candidate, open Job Postings, choose the relevant job, click View applicants, find the candidate, then click Interview. Choose the date, time, interview mode, and meeting details, then save it. The candidate will see the scheduled interview in their Interviews section.",
+                    "InterviewScheduling.HowTo"));
+            }
+
             if (context.Candidate is not null && tokens.Overlaps(new[] { "resume", "resumes", "cv" })
                 && tokens.Overlaps(new[] { "upload", "uploaded", "parse", "parsed", "parsing" }))
             {
