@@ -206,24 +206,31 @@ namespace IRAS.Application.Modules.Applications
                 .ToListAsync(ct);
             if (staleApplications.Count > 0)
             {
-                var signalsByCandidate = await _scoring.ComputeMatchSignalsAsync(
-                    job,
-                    staleApplications.Select(a => (a.CandidateId, ResumeText: a.Resume.ParsedText!)).ToList(),
-                    ct);
-
-                foreach (var application in staleApplications)
+                try
                 {
-                    if (!signalsByCandidate.TryGetValue(application.CandidateId, out var signals))
-                        continue;
-                    if (signals.SemanticSimilarity <= 0m && signals.MlFitScore is null)
-                        continue;
+                    var signalsByCandidate = await _scoring.ComputeMatchSignalsAsync(
+                        job,
+                        staleApplications.Select(a => (a.CandidateId, ResumeText: a.Resume.ParsedText!)).ToList(),
+                        ct);
 
-                    application.SemanticSimilarity = signals.SemanticSimilarity;
-                    application.TotalScore = _scoring.ComputeTotalScore(
-                        application.SkillMatch, application.SemanticSimilarity, signals.MlFitScore, application.AssessmentScore);
+                    foreach (var application in staleApplications)
+                    {
+                        if (!signalsByCandidate.TryGetValue(application.CandidateId, out var signals))
+                            continue;
+                        if (signals.SemanticSimilarity <= 0m && signals.MlFitScore is null)
+                            continue;
+
+                        application.SemanticSimilarity = signals.SemanticSimilarity;
+                        application.TotalScore = _scoring.ComputeTotalScore(
+                            application.SkillMatch, application.SemanticSimilarity, signals.MlFitScore, application.AssessmentScore);
+                    }
+
+                    await _db.SaveChangesAsync(ct);
                 }
-
-                await _db.SaveChangesAsync(ct);
+                catch (Exception) when (!ct.IsCancellationRequested)
+                {
+                    // Keep the applicant page loadable when the external AI service is cold/down.
+                }
             }
 
             var applicants = await _db.Applications
@@ -274,8 +281,16 @@ namespace IRAS.Application.Modules.Applications
             if (application.SemanticSimilarity > 0m || string.IsNullOrWhiteSpace(application.Resume.ParsedText))
                 return;
 
-            var signals = await _scoring.ComputeMatchSignalAsync(
-                application.CandidateId, application.Resume.ParsedText!, application.Job, ct);
+            MatchSignals signals;
+            try
+            {
+                signals = await _scoring.ComputeMatchSignalAsync(
+                    application.CandidateId, application.Resume.ParsedText!, application.Job, ct);
+            }
+            catch (Exception) when (!ct.IsCancellationRequested)
+            {
+                return;
+            }
             if (signals.SemanticSimilarity <= 0m && signals.MlFitScore is null)
                 return;
 

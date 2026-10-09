@@ -43,7 +43,7 @@ namespace IRAS.Application.Common.Ai
                         s.SkillId, s.SkillName, s.MatchedText, s.MatchedBy, s.Occurrences)).ToList(),
                     result.Emails, result.Phones, result.WordCount);
             }
-            catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
+            catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or JsonException or InvalidOperationException)
             {
                 // Infrastructure failure != parse failure. The caller decides what
                 // to persist; we log and surface a candidate-safe message.
@@ -83,7 +83,7 @@ namespace IRAS.Application.Common.Ai
                         r.FitLabel,
                         r.FitScore.HasValue ? (decimal)r.FitScore.Value : null)).ToList());
             }
-            catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
+            catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or JsonException or InvalidOperationException)
             {
                 _logger.LogError(ex, "AI service ranking call failed ({CandidateCount} candidates)", candidates.Count);
                 return new RankResult(false,

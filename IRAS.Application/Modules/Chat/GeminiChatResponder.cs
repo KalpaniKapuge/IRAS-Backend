@@ -157,7 +157,7 @@ namespace IRAS.Application.Modules.Chat
                 httpResponse.EnsureSuccessStatusCode();
                 result = await httpResponse.Content.ReadFromJsonAsync<GeminiResponse>(JsonOpts, ct);
             }
-            catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or JsonException)
+            catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or JsonException or InvalidOperationException)
             {
                 _logger.LogError(ex, "Gemini chat call failed");
                 return new ChatReply(
@@ -293,13 +293,13 @@ namespace IRAS.Application.Modules.Chat
         // Mirrors Gemini's Interactions API JSON shape — see GeminiJdGenerator for the
         // same contract, confirmed live against the real endpoint.
         private record GeminiRequest(
-            [property: JsonPropertyName("systemInstruction")] GeminiContent SystemInstruction,
+            [property: JsonPropertyName("system_instruction")] GeminiContent SystemInstruction,
             [property: JsonPropertyName("contents")] List<GeminiContent> Contents,
-            [property: JsonPropertyName("generationConfig")] GeminiGenerationConfig GenerationConfig);
+            [property: JsonPropertyName("generation_config")] GeminiGenerationConfig GenerationConfig);
 
         private record GeminiGenerationConfig(
-            [property: JsonPropertyName("maxOutputTokens")] int MaxOutputTokens,
-            [property: JsonPropertyName("responseMimeType")] string ResponseMimeType);
+            [property: JsonPropertyName("max_output_tokens")] int MaxOutputTokens,
+            [property: JsonPropertyName("response_mime_type")] string ResponseMimeType);
 
         private record GeminiResponse([property: JsonPropertyName("candidates")] List<GeminiCandidate>? Candidates);
         private record GeminiCandidate([property: JsonPropertyName("content")] GeminiContent? Content);

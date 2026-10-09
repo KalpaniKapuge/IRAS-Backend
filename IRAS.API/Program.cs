@@ -272,13 +272,21 @@ builder.Services.AddScoped<IApplicationService, ApplicationService>();
 builder.Services.AddScoped<IInterviewService, InterviewService>();
 
 builder.Services.AddScoped<IKnowledgeBaseService, KnowledgeBaseService>();
-builder.Services.AddHttpClient<IChatResponder, GeminiChatResponder>((sp, client) =>
+builder.Services.AddScoped<RuleBasedChatResponder>();
+if (geminiConfigured)
 {
-    var opts = builder.Configuration.GetSection(GeminiOptions.SectionName).Get<GeminiOptions>()
-        ?? new GeminiOptions();
-    client.BaseAddress = new Uri(opts.BaseUrl);
-    client.Timeout = TimeSpan.FromSeconds(60);
-});
+    builder.Services.AddHttpClient<IChatResponder, GeminiChatResponder>((sp, client) =>
+    {
+        var opts = builder.Configuration.GetSection(GeminiOptions.SectionName).Get<GeminiOptions>()
+            ?? new GeminiOptions();
+        client.BaseAddress = new Uri(opts.BaseUrl);
+        client.Timeout = TimeSpan.FromSeconds(60);
+    });
+}
+else
+{
+    builder.Services.AddScoped<IChatResponder, RuleBasedChatResponder>();
+}
 builder.Services.AddScoped<IChatService, ChatService>();
 builder.Services.AddScoped<IChatContextBuilder, CandidateChatContextBuilder>();
 builder.Services.AddScoped<IChatContextBuilder, EmployerChatContextBuilder>();
@@ -375,6 +383,7 @@ if (!string.IsNullOrWhiteSpace(uploadsRoot))
 app.UseCors("AllowFrontend");
 app.UseAuthentication();
 app.UseAuthorization();
+app.MapGet("/health", () => Results.Ok(new { status = "ok", service = "iras-api" })).AllowAnonymous();
 app.MapControllers();
 app.Run();
 

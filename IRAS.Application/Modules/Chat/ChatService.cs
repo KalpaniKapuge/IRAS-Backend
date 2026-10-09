@@ -13,15 +13,17 @@ namespace IRAS.Application.Modules.Chat
     {
         private readonly IrasDbContext _db;
         private readonly IChatResponder _responder;
+        private readonly RuleBasedChatResponder _fallbackResponder;
         private readonly INotificationService _notifications;
         private readonly IReadOnlyDictionary<string, IChatContextBuilder> _contextBuilders;
 
         public ChatService(
-            IrasDbContext db, IChatResponder responder, INotificationService notifications,
+            IrasDbContext db, IChatResponder responder, RuleBasedChatResponder fallbackResponder, INotificationService notifications,
             IEnumerable<IChatContextBuilder> contextBuilders)
         {
             _db = db;
             _responder = responder;
+            _fallbackResponder = fallbackResponder;
             _notifications = notifications;
             _contextBuilders = contextBuilders.ToDictionary(b => b.Role);
         }
@@ -40,7 +42,17 @@ namespace IRAS.Application.Modules.Chat
             }
 
             var context = await BuildContextAsync(userId, role, ct);
-            var reply = await _responder.RespondAsync(request.Message, context, ct);
+            ChatReply reply;
+            try
+            {
+                reply = await _responder.RespondAsync(request.Message, context, ct);
+                if (_responder.IsAi && string.Equals(reply.Intent, "Error", StringComparison.OrdinalIgnoreCase))
+                    reply = await _fallbackResponder.RespondAsync(request.Message, context, ct);
+            }
+            catch (Exception) when (!ct.IsCancellationRequested)
+            {
+                reply = await _fallbackResponder.RespondAsync(request.Message, context, ct);
+            }
 
             _db.ChatMessages.Add(new ChatMessage
             {

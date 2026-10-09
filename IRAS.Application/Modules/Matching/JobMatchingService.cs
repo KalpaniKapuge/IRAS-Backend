@@ -72,7 +72,15 @@ namespace IRAS.Application.Modules.Matching
 
             // One batched HTTP call to the AI service for every eligible candidate's resume
             // against this single job — not N sequential calls.
-            var matchSignals = await _scoring.ComputeMatchSignalsAsync(job, eligible, ct);
+            Dictionary<int, MatchSignals> matchSignals;
+            try
+            {
+                matchSignals = await _scoring.ComputeMatchSignalsAsync(job, eligible, ct);
+            }
+            catch (Exception) when (!ct.IsCancellationRequested)
+            {
+                matchSignals = new Dictionary<int, MatchSignals>();
+            }
 
             foreach (var (candidateId, _) in eligible)
             {
@@ -195,9 +203,19 @@ namespace IRAS.Application.Modules.Matching
             var appliedJobIdSet = appliedJobIds.ToHashSet();
 
             // One taxonomy fetch + bounded-concurrency AI calls for all jobs at once,
-            // instead of a fetch + a call sequentially per job.
-            var signalsByJob = await _scoring.ComputeMatchSignalsForCandidateAsync(
-                candidateId, candidate.ResumeText!, jobs, ct);
+            // instead of a fetch + a call sequentially per job. If the external AI service
+            // is cold/down, the page must still load with deterministic skill scores; resume
+            // relevance stays 0 instead of being faked from the skill score.
+            Dictionary<int, MatchSignals> signalsByJob;
+            try
+            {
+                signalsByJob = await _scoring.ComputeMatchSignalsForCandidateAsync(
+                    candidateId, candidate.ResumeText!, jobs, ct);
+            }
+            catch (Exception) when (!ct.IsCancellationRequested)
+            {
+                signalsByJob = new Dictionary<int, MatchSignals>();
+            }
 
             var recommendations = jobs.Select(job =>
             {

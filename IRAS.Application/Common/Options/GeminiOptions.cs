@@ -23,10 +23,7 @@ namespace IRAS.Application.Common.Options
             if (string.IsNullOrWhiteSpace(model)) return DefaultModel;
 
             var trimmed = model.Trim();
-            return trimmed.Equals("gemini-3.6-flash", StringComparison.OrdinalIgnoreCase) ||
-                   trimmed.Equals("gemini-3.5-flash", StringComparison.OrdinalIgnoreCase)
-                ? DefaultModel
-                : trimmed;
+            return trimmed;
         }
     }
 }
