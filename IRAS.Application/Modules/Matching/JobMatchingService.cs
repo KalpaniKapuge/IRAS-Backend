@@ -7,6 +7,7 @@ using IRAS.Application.Modules.Matching.DTOs;
 using IRAS.Domain.Entities.Jobs;
 using IRAS.Domain.Enums;
 using IRAS.Infrastructure.Data;
+using System.Text.RegularExpressions;
 
 namespace IRAS.Application.Modules.Matching
 {
@@ -202,40 +203,60 @@ namespace IRAS.Application.Modules.Matching
                 .ToListAsync(ct);
             var appliedJobIdSet = appliedJobIds.ToHashSet();
 
-            // One taxonomy fetch + bounded-concurrency AI calls for all jobs at once,
-            // instead of a fetch + a call sequentially per job. If the external AI service
-            // is cold/down, the page must still load with deterministic skill scores; resume
-            // relevance stays 0 instead of being faked from the skill score.
-            Dictionary<int, MatchSignals> signalsByJob;
-            try
-            {
-                signalsByJob = await _scoring.ComputeMatchSignalsForCandidateAsync(
-                    candidateId, candidate.ResumeText!, jobs, ct);
-            }
-            catch (Exception) when (!ct.IsCancellationRequested)
-            {
-                signalsByJob = new Dictionary<int, MatchSignals>();
-            }
-
             var recommendations = jobs.Select(job =>
             {
                 var skillMatch = _scoring.ComputeSkillMatch(job.RequiredSkills, candidateSkillIds);
-                var signals = signalsByJob.GetValueOrDefault(job.JobId, new MatchSignals(0m, null));
-                var semanticSimilarity = signals.SemanticSimilarity;
+                var semanticSimilarity = ComputeLexicalResumeRelevance(JobText(job), candidate.ResumeText!);
                 return new JobRecommendationDto
                 {
                     JobId = job.JobId,
                     JobTitle = job.Title,
                     CompanyName = job.Employer.CompanyName,
-                    MatchScore = _scoring.ComputeTotalScore(skillMatch, semanticSimilarity, signals.MlFitScore),
+                    MatchScore = _scoring.ComputeTotalScore(skillMatch, semanticSimilarity),
                     SkillMatch = skillMatch,
                     SemanticSimilarity = semanticSimilarity,
-                    MlFitScore = signals.MlFitScore,
+                    MlFitScore = null,
                     HasApplied = appliedJobIdSet.Contains(job.JobId)
                 };
             });
 
             return recommendations.OrderByDescending(r => r.MatchScore).Take(20).ToList();
         }
+
+        private static string JobText(Job job)
+        {
+            var primaryText = FirstNonBlank(job.GeneratedJd, job.RequirementInput, job.Title);
+            var requiredSkills = job.RequiredSkills
+                .Select(rs => rs.Skill?.SkillName)
+                .Where(s => !string.IsNullOrWhiteSpace(s));
+            return string.Join(' ', new[] { primaryText }.Concat(requiredSkills));
+        }
+
+        private static string FirstNonBlank(params string?[] values) =>
+            values.FirstOrDefault(v => !string.IsNullOrWhiteSpace(v))?.Trim() ?? string.Empty;
+
+        private static decimal ComputeLexicalResumeRelevance(string jobText, string resumeText)
+        {
+            var jobTerms = Tokenize(jobText).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var resumeTerms = Tokenize(resumeText).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            if (jobTerms.Count == 0 || resumeTerms.Count == 0)
+                return 0m;
+
+            var overlap = jobTerms.Count(resumeTerms.Contains);
+            var cosine = overlap / Math.Sqrt(jobTerms.Count * resumeTerms.Count);
+            return Math.Round((decimal)Math.Clamp(cosine, 0d, 1d), 4);
+        }
+
+        private static IEnumerable<string> Tokenize(string text) =>
+            Regex.Matches(text.ToLowerInvariant(), "[a-z0-9+#.]{2,}")
+                .Select(m => m.Value)
+                .Where(t => !StopWords.Contains(t));
+
+        private static readonly HashSet<string> StopWords = new(StringComparer.OrdinalIgnoreCase)
+        {
+            "the", "and", "for", "with", "you", "your", "are", "this", "that", "will",
+            "from", "have", "has", "our", "job", "role", "work", "team", "using",
+            "use", "can", "able", "about", "into", "such", "their", "they", "them"
+        };
     }
 }
