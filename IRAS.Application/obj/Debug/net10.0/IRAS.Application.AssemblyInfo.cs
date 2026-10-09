@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("IRAS.Application")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+da86caaf58cfda27873521008ed9fb9b1638cec2")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+c4ed4eac51c566eec2f00dd095f7f8ea767909be")]
 [assembly: System.Reflection.AssemblyProductAttribute("IRAS.Application")]
 [assembly: System.Reflection.AssemblyTitleAttribute("IRAS.Application")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
